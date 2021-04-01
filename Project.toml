@@ -1,0 +1,4 @@
+name = "PurlinLine"
+uuid = "720b0b74-7d22-47cf-9c9b-19f6078eb386"
+authors = ["Cris Moen <cris.moen@runtosolve.com>"]
+version = "0.1.0"
