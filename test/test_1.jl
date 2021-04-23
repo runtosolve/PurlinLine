@@ -4,6 +4,7 @@ using StructuresKit
 #INPUT LAYER
 
 
+
 mutable struct purlin_line_object
 
     design_code::String
@@ -28,9 +29,48 @@ mutable struct purlin_line_object
     kp::Vector{Float64}
     kϕ::Vector{Float64}
     kϕ_dist::Vector{Float64}
-    L_crd::Vector{Float64}
+    Lcrd_AISI::Vector{Float64}
     Lm::Float64
     kx::Vector{Float64}
+
+    Lcrd_pos_CUFSM::Vector{Float64}
+    Lcrd_neg_CUFSM::Vector{Float64}
+    Mcrd_pos::Vector{Float64}
+    Mcrd_neg::Vector{Float64}
+
+    Lcrℓ_xx_pos::Vector{Float64}
+    Lcrℓ_xx_neg::Vector{Float64}
+    Mcrℓ_xx_pos::Vector{Float64}
+    Mcrℓ_xx_neg::Vector{Float64}
+    Lcrℓ_yy_pos::Vector{Float64}
+    Lcrℓ_yy_neg::Vector{Float64}
+    Mcrℓ_yy_pos::Vector{Float64}
+    Mcrℓ_yy_neg::Vector{Float64}
+    
+    CUFSM_local_xx_pos_data::Array{CUFSM.data}
+    CUFSM_local_xx_neg_data::Array{CUFSM.data}
+    CUFSM_local_yy_pos_data::Array{CUFSM.data}
+    CUFSM_local_yy_neg_data::Array{CUFSM.data}
+    CUFSM_dist_pos_data::Array{CUFSM.data}
+    CUFSM_dist_neg_data::Array{CUFSM.data}
+
+    Sxx_pos::Vector{Float64}
+    Sxx_neg::Vector{Float64}
+    My_xx::Vector{Float64}
+    Mne_xx::Vector{Float64}
+    Mnℓ_xx_pos::Vector{Float64}
+    Mnℓ_xx_neg::Vector{Float64}
+    eMnℓ_xx_pos::Vector{Float64}
+    eMnℓ_xx_neg::Vector{Float64}
+
+    Syy_pos::Vector{Float64}
+    Syy_neg::Vector{Float64}
+    My_yy::Vector{Float64}
+    Mne_yy::Vector{Float64}
+    Mnℓ_yy_pos::Vector{Float64}
+    Mnℓ_yy_neg::Vector{Float64}
+    eMnℓ_yy_pos::Vector{Float64}
+    eMnℓ_yy_neg::Vector{Float64}
 
     purlin_line_object() = new()
 
@@ -92,44 +132,99 @@ purlin_line.frame_flange_width = frame_flange_width
 purlin_line.support_locations = support_locations
 purlin_line.bridging_locations = bridging_locations
 
-#DEFINITIONS LAYER
+#CALCULATIONS LAYER
 
 ##Calculate properties associated with each purlin line segment.
 
-#Calculate the purlin section properties.
+#Calculate purlin section properties.
 purlin_line.section_properties, purlin_line.free_flange_section_properties, purlin_line.cross_section_node_geometry, purlin_line.cross_section_element_connectivity = PurlinLine.calculate_purlin_section_properties(purlin_line.cross_section_dimensions)
 
-purlin_line.kp, purlin_line.kϕ, purlin_line.kϕ_dist, purlin_line.kx, purlin_line.Lm = PurlinLine.define_deck_bracing_properties(purlin_line)
+#Calculate deck bracing properties. 
+purlin_line.kp, purlin_line.kϕ, purlin_line.kϕ_dist, purlin_line.kx, purlin_line.Lm, purlin_line.Lcrd_AISI = PurlinLine.define_deck_bracing_properties(purlin_line)
+
+#Calculate the critical elastic local buckling and distortional buckling properties for each purlin line segment.
+
+purlin_line.CUFSM_local_xx_pos_data, purlin_line.CUFSM_local_xx_neg_data, purlin_line.CUFSM_local_yy_pos_data, purlin_line.CUFSM_local_yy_neg_data, purlin_line.CUFSM_dist_pos_data, purlin_line.CUFSM_dist_neg_data, purlin_line.Mcrℓ_xx_pos, purlin_line.Mcrℓ_xx_neg, purlin_line.Mcrℓ_yy_pos, purlin_line.Mcrℓ_yy_neg, purlin_line.Mcrd_pos, purlin_line.Mcrd_neg, purlin_line.Lcrℓ_xx_pos, purlin_line.Lcrℓ_xx_neg, purlin_line.Lcrℓ_yy_pos, purlin_line.Lcrℓ_yy_neg, purlin_line.Lcrd_pos_CUFSM, purlin_line.Lcrd_neg_CUFSM = calculate_elastic_buckling_properties(purlin_line)
 
 
-P = 1.0
-Mxx = 0.0
-Mzz = 0.0
-M11 = 0.0
-M22 = 0.0
-A = purlin_line.section_properties[1].A
-xcg = purlin_line.section_properties[1].xc
-zcg = purlin_line.section_properties[1].yc
-Ixx = purlin_line.section_properties[1].Ixx
-Izz = purlin_line.section_properties[1].Iyy
-Ixz = purlin_line.section_properties[1].Ixy
-thetap = rad2deg(purlin_line.section_properties[1].θ)
-I11 = purlin_line.section_properties[1].I1
-I22 = purlin_line.section_properties[1].I2
-unsymm = 1
+#Calculate the flexural strength for each purlin line segment.   
 
-num_cross_section_nodes = size(purlin_line.cross_section_node_geometry[1])[1]
-node = zeros(Float64, (num_cross_section_nodes, 8))
-node[:, 2:3] .= purlin_line.cross_section_node_geometry[1]
+function calculate_flexural_strength(purlin_line)
 
-node = CUFSM.stresgen(node,P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+    num_purlin_segments = size(purlin_line.segments)[1]
 
-#Calculate
-#local buckling
-#calculate along with cross-section
+    Sxx_top = zeros(Float64, num_purlin_segments)
+    Sxx_bottom = zeros(Float64, num_purlin_segments)
+    My_xx = zeros(Float64, num_purlin_segments)
+    Mne_xx = zeros(Float64, num_purlin_segments)
+    Mcrℓ_xx_pos = zeros(Float64, num_purlin_segments)
+    Mcrℓ_xx_neg = zeros(Float64, num_purlin_segments)
+    Mnℓ_xx_pos = zeros(Float64, num_purlin_segments)
+    Mnℓ_xx_neg = zeros(Float64, num_purlin_segments)
+    eMnℓ_xx_pos = zeros(Float64, num_purlin_segments)
+    eMnℓ_xx_neg = zeros(Float64, num_purlin_segments)
 
-#bracing stiffnesses
-#distortional buckling
+    for i = 1:num_purlin_segments
+
+        #Define the section property index associated with purlin segment i.
+        section_index = purlin_line.segments[i][2]
+
+        #Define the material property index associated with purlin segment i.
+        material_index = purlin_line.segments[i][3]
+
+        #strong axis flexure, local-global interaction
+        Fy = purlin_line.material_properties[material_index][3]
+        Ixx = purlin_line.section_properties[section_index].Ixx
+        ho = purlin_line.cross_section_dimensions[section_index][5]
+        ycy = ho/2  #distance from neutral axis to outer fiber
+        Sxx[i] = Ixx/ycy
+        My_xx[i] = Fy*Sxx[i]
+        Mne_xx[i] = My_xx[i]  #handle global buckling in the ThinWalledBeam second order analysis
+        Mcrℓ_xx[i] = purlin_line.Mcrℓ_xx[section_index]
+
+        if purlin_line.design_code == "AISI S100-16 ASD"
+            ASDorLRFD = 0
+        elseif purlin_line.design_code == "AISI S100-16 LRFD"
+            ASDorLRFD = 1
+        end
+
+        Mnℓ_xx[i], eMnℓ_xx[i] =  AISIS10016.f321(Mne_xx[i], Mcrℓ_xx[i], ASDorLRFD)
+
+
+        #weak axis flexure, local-global interaction
+        Iyy = purlin_line.section_properties[section_index].Ixx
+        t = purlin_line.cross_section_dimensions[i][2]
+        b = Mesh.create_line_element_property_array(memberDefinitions, dm, dz, crossSectionDimensions, 3, 3)
+        d = Mesh.create_line_element_property_array(memberDefinitions, dm, dz, crossSectionDimensions, 3, 4)
+        θc = Mesh.create_line_element_property_array(memberDefinitions, dm, dz, crossSectionDimensions, 3, 5)
+
+        #distance from neutral axis to outer fiber
+        ycx = b.+d.*cos.(deg2rad.(θc)) .-t./2
+        Syy = Iyy./ycx
+        Myyy = Fy.*Syy
+        Mneyy = Myyy
+        Mcrℓyy = Mesh.create_line_element_property_array(memberDefinitions, dm, dz, sectionProperties, 3, 8)
+
+        Mnℓyy = zeros(Float64, numberOfNodes)
+        eMnℓyy = zeros(Float64, numberOfNodes)
+        for i in eachindex(Mcrℓyy)
+            Mnℓyy[i], eMnℓyy[i] = AISIS10016.f321(Mneyy[i], Mcrℓyy[i], ASDorLRFD)
+        end
+
+
+
+    end
+
+    return Sxx, My_xx, Mne_xx, Mcrℓ_xx, Mnℓ_xx, eMnℓ_xx
+
+end
+
+
+
+
+
+
+
 #flexural strength
 #shear strength
 #web crippling strength

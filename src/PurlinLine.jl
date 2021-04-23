@@ -4,7 +4,7 @@ module PurlinLine
 using StructuresKit
 
 
-export calculate_purlin_section_properties, deck_pull_through_fastener_stiffness, define_deck_bracing_properties
+export calculate_purlin_section_properties, deck_pull_through_fastener_stiffness, define_deck_bracing_properties, calculate_elastic_buckling_properties
 
 
 function define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n, n_radius)
@@ -242,6 +242,7 @@ function define_deck_bracing_properties(purlin_line)
         kϕ = zeros(Float64, num_purlin_segments)
         kϕ_dist = zeros(Float64, num_purlin_segments)
         kx = zeros(Float64, num_purlin_segments)
+        Lcrd = zeros(Float64, num_purlin_segments)
 
         #Loop over all the purlin segments in the line.
         for i = 1:num_purlin_segments
@@ -301,10 +302,10 @@ function define_deck_bracing_properties(purlin_line)
             Af, Jf, Ixf, Iyf, Ixyf, Cwf, xof,  hxf, hyf, yof = AISIS10016.table23131(CorZ, t_purlin, b_top, d_top, θ_top)
 
             #Calculate the purlin distortional buckling half-wavelength.
-            Lcrd, L = AISIS10016.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
+            Lcrd[i], L = AISIS10016.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
 
             #If Lcrd is longer than the fastener spacing, then the distortional buckling will be restrained by the deck.
-            if Lcrd >= Lm
+            if Lcrd[i] >= Lm
                 kϕ_dist[i] = kϕ[i]
             else
                 kϕ_dist[i] = 0.0
@@ -322,10 +323,219 @@ function define_deck_bracing_properties(purlin_line)
 
     end
 
-    return kp, kϕ, kϕ_dist, kx, Lm
+    return kp, kϕ, kϕ_dist, kx, Lm, Lcrd
 
 end
 
+function get_elastic_buckling(prop, node, elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
 
+    node_with_stress = CUFSM.stresgen(node,P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+
+    curve, shapes = CUFSM.strip(prop, node_with_stress, elem, lengths, springs, constraints, neigs)
+
+    data = CUFSM.data(prop, node_with_stress, elem, lengths, springs, constraints, neigs, curve, shapes)
+
+    half_wavelength = [curve[i,1][1] for i=1:length(lengths)]
+    load_factor = [curve[i,1][2] for i=1:length(lengths)]
+
+    Mcr = minimum(load_factor)
+
+    min_index = findfirst(x->x==minimum(load_factor), load_factor)    
+
+    Lcr = half_wavelength[min_index]
+
+    return data, Mcr, Lcr
+
+end
+
+function calculate_elastic_buckling_properties(purlin_line)
+
+    num_purlin_segments = size(purlin_line.segments)[1]
+
+    CUFSM_local_xx_pos_data = Array{CUFSM.data, 1}(undef, num_purlin_segments)
+    CUFSM_local_xx_neg_data = Array{CUFSM.data, 1}(undef, num_purlin_segments)
+    CUFSM_local_yy_pos_data = Array{CUFSM.data, 1}(undef, num_purlin_segments)
+    CUFSM_local_yy_neg_data = Array{CUFSM.data, 1}(undef, num_purlin_segments)
+    CUFSM_dist_pos_data = Array{CUFSM.data, 1}(undef, num_purlin_segments)
+    CUFSM_dist_neg_data = Array{CUFSM.data, 1}(undef, num_purlin_segments)
+    Mcrd_pos = Array{Float64, 1}(undef, num_purlin_segments)
+    Mcrd_neg = Array{Float64, 1}(undef, num_purlin_segments)
+    Mcrℓ_xx_pos = Array{Float64, 1}(undef, num_purlin_segments)
+    Mcrℓ_xx_neg = Array{Float64, 1}(undef, num_purlin_segments)
+    Mcrℓ_yy_pos = Array{Float64, 1}(undef, num_purlin_segments)
+    Mcrℓ_yy_neg = Array{Float64, 1}(undef, num_purlin_segments)
+    Lcrd_pos_CUFSM = Array{Float64, 1}(undef, num_purlin_segments)
+    Lcrd_neg_CUFSM = Array{Float64, 1}(undef, num_purlin_segments)
+    Lcrℓ_xx_pos = Array{Float64, 1}(undef, num_purlin_segments)
+    Lcrℓ_xx_neg = Array{Float64, 1}(undef, num_purlin_segments)
+    Lcrℓ_yy_pos = Array{Float64, 1}(undef, num_purlin_segments)
+    Lcrℓ_yy_neg = Array{Float64, 1}(undef, num_purlin_segments)
+
+    #Loop over all the purlin segments in the line.
+    for i = 1:num_purlin_segments
+
+        #Define the section property index associated with purlin segment i.
+        section_index = purlin_line.segments[i][2]
+
+        #Define the material property index associated with purlin segment i.
+        material_index = purlin_line.segments[i][3]
+        
+        #Map section properties to CUFSM.
+        A = purlin_line.section_properties[section_index].A
+        xcg = purlin_line.section_properties[section_index].xc
+        zcg = purlin_line.section_properties[section_index].yc
+        Ixx = purlin_line.section_properties[section_index].Ixx
+        Izz = purlin_line.section_properties[section_index].Iyy
+        Ixz = purlin_line.section_properties[section_index].Ixy
+        thetap = rad2deg(purlin_line.section_properties[section_index].θ)
+        I11 = purlin_line.section_properties[section_index].I1
+        I22 = purlin_line.section_properties[section_index].I2
+        unsymm = 0  #Sets Ixz=0 if unsymm = 0
+
+        #Define the number of cross-section nodes.
+        num_cross_section_nodes = size(purlin_line.cross_section_node_geometry[section_index])[1]
+
+        #Initialize CUFSM node matrix.
+        node = zeros(Float64, (num_cross_section_nodes, 8))
+
+        #Add node numbers to node matrix.
+        node[:, 1] .= 1:num_cross_section_nodes
+
+        #Add nodal coordinates to node matrix.
+        node[:, 2:3] .= purlin_line.cross_section_node_geometry[section_index]
+
+        #Add nodal restraints to node matrix.
+        node[:, 4:7] .= ones(num_cross_section_nodes,4)
+
+        #Define number of cross-section elements.
+        num_cross_section_elements = size(purlin_line.cross_section_element_connectivity[section_index])[1]
+
+        #Initialize CUFSM elem matrix.
+        elem = zeros(Float64, (num_cross_section_elements, 5))
+
+        #Add element numbers to elem matrix.
+        elem[:, 1] = 1:num_cross_section_elements
+
+        #Add element connectivity and thickness to elem matrix.
+        elem[:, 2:4] .= purlin_line.cross_section_element_connectivity[section_index]
+
+        #Add element material reference to elem matrix.
+        elem[:, 5] .= ones(num_cross_section_elements) * 100
+                                
+                        #lip curve bottom_flange curve web curve top_flange
+        center_top_flange_node = 4 + 4 + 4 + 4 + 4 + 4 + 2 + 1
+        springs = [1 center_top_flange_node 0 purlin_line.kx[i] 0 0 purlin_line.kϕ_dist[i] 0 0 0]
+        constraints = 0
+
+        E = purlin_line.material_properties[material_index][1]
+        ν = purlin_line.material_properties[material_index][2]
+        G = E / (2 *(1 + ν))
+        prop = [100 E E ν ν G]
+
+        neigs = 1  #just need the first mode 
+
+        ###Local buckling - xx axis, positive 
+
+        #Add reference stress to node matrix.
+
+        #Define reference loads.  
+        P = 0.0
+        Mxx = 1.0  #assume centroidal moment always for now
+        Mzz = 0.0
+        M11 = 0.0
+        M22 = 0.0
+
+        h = purlin_line.cross_section_dimensions[section_index][5]  #this is a little dangerous
+        length_inc = 5
+        lengths = collect(0.25*h:0.75*h/length_inc:1.0*h)   #define to catch the local minimum
+
+        CUFSM_local_xx_pos_data[i], Mcrℓ_xx_pos[i], Lcrℓ_xx_pos[i] = get_elastic_buckling(prop, deepcopy(node), elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)   
+        
+        #Needed this deepcopy here to make struct work correctly.  Otherwise 'node' just kept changing.
+
+
+        ###Local buckling - xx axis, negative 
+
+        #Add reference stress to node matrix.
+
+        #Define reference loads.  
+        P = 0.0
+        Mxx = -1.0  #assume centroidal moment always for now
+        Mzz = 0.0
+        M11 = 0.0
+        M22 = 0.0
+
+        h = purlin_line.cross_section_dimensions[section_index][5]  #this is a little dangerous
+        length_inc = 5
+        lengths = collect(0.25*h:0.75*h/length_inc:1.0*h)   #define to catch the local minimum
+
+        CUFSM_local_xx_neg_data[i], Mcrℓ_xx_neg[i], Lcrℓ_xx_neg[i] = get_elastic_buckling(prop, deepcopy(node), elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+
+
+        ###local buckling - yy axis, positive
+        
+        #Define reference loads.  
+        P = 0.0
+        Mxx = 0.0  
+        Mzz = 1.0  #assume centroidal moment always for now
+        M11 = 0.0
+        M22 = 0.0
+
+        #Try Lcrd as a guide for finding the half-wavelength of the flange and lip (unstiffened element).
+        length_inc = 5
+        lengths = collect(0.25 * purlin_line.Lcrd_AISI[i]:1.0/length_inc:1.25 * purlin_line.Lcrd_AISI[i])   #define to catch the local minimum
+
+        CUFSM_local_yy_pos_data[i], Mcrℓ_yy_pos[i], Lcrℓ_yy_pos[i] = get_elastic_buckling(prop, deepcopy(node), elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+
+  
+        ###local buckling - yy axis, negative
+        
+        #Define reference loads.  
+        P = 0.0
+        Mxx = 0.0  
+        Mzz = -1.0  #assume centroidal moment always for now
+        M11 = 0.0
+        M22 = 0.0
+    
+        length_inc = 5
+        #Try Lcrd as a guide for finding the half-wavelength of the flange and lip (unstiffened element).
+        lengths = collect(0.25 * purlin_line.Lcrd_AISI[i]:1.0/length_inc:1.25 * purlin_line.Lcrd_AISI[i])   #define to catch the local minimum
+
+        CUFSM_local_yy_neg_data[i], Mcrℓ_yy_neg[i], Lcrℓ_yy_neg[i] = get_elastic_buckling(prop, deepcopy(node), elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+
+        ###Distortional buckling - xx axis, positive
+
+        #Define reference loads.  
+        P = 0.0
+        Mxx = 1.0  #assume centroidal moment always for now
+        Mzz = 0.0
+        M11 = 0.0
+        M22 = 0.0
+
+        length_inc = 5
+        lengths = collect(0.75 * purlin_line.Lcrd_AISI[i]:0.50/length_inc:1.25 * purlin_line.Lcrd_AISI[i])  #define to catch distortional minimum
+
+        CUFSM_dist_pos_data[i], Mcrd_pos[i], Lcrd_pos_CUFSM[i] = get_elastic_buckling(prop, deepcopy(node), elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+
+         ###Distortional buckling - xx axis, negative
+
+        #Define reference loads.  
+        P = 0.0
+        Mxx = -1.0  #assume centroidal moment always for now
+        Mzz = 0.0
+        M11 = 0.0
+        M22 = 0.0
+
+        length_inc = 5
+        lengths = collect(0.75 * purlin_line.Lcrd_AISI[i]:0.50/length_inc:1.25 * purlin_line.Lcrd_AISI[i])  #define to catch distortional minimum
+
+        CUFSM_dist_neg_data[i], Mcrd_neg[i], Lcrd_neg_CUFSM[i] = get_elastic_buckling(prop, deepcopy(node), elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
+
+    end
+
+    return CUFSM_local_xx_pos_data, CUFSM_local_xx_neg_data, CUFSM_local_yy_pos_data, CUFSM_local_yy_neg_data, CUFSM_dist_pos_data, CUFSM_dist_neg_data, Mcrℓ_xx_pos, Mcrℓ_xx_neg, Mcrℓ_yy_pos, Mcrℓ_yy_neg, Mcrd_pos, Mcrd_neg, Lcrℓ_xx_pos, Lcrℓ_xx_neg, Lcrℓ_yy_pos, Lcrℓ_yy_neg, Lcrd_pos_CUFSM, Lcrd_neg_CUFSM
+
+
+end
 
 end # module
