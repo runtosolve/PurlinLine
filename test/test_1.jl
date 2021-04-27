@@ -1,104 +1,30 @@
 using PurlinLine
 using StructuresKit
 
-#INPUT LAYER
-
-
 
 mutable struct purlin_line_object
 
-    design_code::String
-    loading_direction::String
-    segments::Vector{Tuple{Float64, Int64, Int64}}
-    spacing::Float64
-    roof_slope::Float64
-    cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}
-    material_properties::Vector{NTuple{4, Float64}}
-    deck_details::Tuple{String, Float64, Float64, Float64, Float64, Float64}
-    deck_material_properties::NTuple{4, Float64}
-    frame_flange_width::Float64
-    support_locations::Vector{Float64}
-    bridging_locations::Vector{Float64}
+    inputs::PurlinLine.Inputs
 
-    section_properties::Vector{StructuresKit.CrossSection.SectionProperties}
-    free_flange_section_properties::Vector{StructuresKit.CrossSection.SectionProperties}
+    cross_section_data::Array{PurlinLine.CrossSectionData}
+    free_flange_cross_section_data::Array{PurlinLine.CrossSectionData}
 
-    cross_section_node_geometry::Vector{Array{Float64}}
-    cross_section_element_connectivity::Vector{Array{Float64}}
+    bracing_data::Array{PurlinLine.BracingData}
 
-    free_flange_cross_section_node_geometry::Vector{Array{Float64}}
-    free_flange_cross_section_element_connectivity::Vector{Array{Float64}}
+    local_buckling_xx_pos::Array{PurlinLine.ElasticBucklingData}
+    local_buckling_xx_neg::Array{PurlinLine.ElasticBucklingData}
+    local_buckling_yy_pos::Array{PurlinLine.ElasticBucklingData}
+    local_buckling_yy_neg::Array{PurlinLine.ElasticBucklingData}
+    distortional_buckling_xx_pos::Array{PurlinLine.ElasticBucklingData}
+    distortional_buckling_xx_neg::Array{PurlinLine.ElasticBucklingData}
 
-    kp::Vector{Float64}
-    kϕ::Vector{Float64}
-    kϕ_dist::Vector{Float64}
-    Lcrd_AISI::Vector{Float64}
-    Lm::Float64
-    kx::Vector{Float64}
+    local_global_flexural_strength_xx::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
+    local_global_flexural_strength_yy::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
+    local_global_flexural_strength_free_flange_yy::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
 
-    Lcrd_pos_CUFSM::Vector{Float64}
-    Lcrd_neg_CUFSM::Vector{Float64}
-    Mcrd_pos::Vector{Float64}
-    Mcrd_neg::Vector{Float64}
+    torsion_strength::Array{PurlinLine.TorsionStrengthData}
 
-    Lcrℓ_xx_pos::Vector{Float64}
-    Lcrℓ_xx_neg::Vector{Float64}
-    Mcrℓ_xx_pos::Vector{Float64}
-    Mcrℓ_xx_neg::Vector{Float64}
-    Lcrℓ_yy_pos::Vector{Float64}
-    Lcrℓ_yy_neg::Vector{Float64}
-    Mcrℓ_yy_pos::Vector{Float64}
-    Mcrℓ_yy_neg::Vector{Float64}
-    
-    CUFSM_local_xx_pos_data::Array{CUFSM.data}
-    CUFSM_local_xx_neg_data::Array{CUFSM.data}
-    CUFSM_local_yy_pos_data::Array{CUFSM.data}
-    CUFSM_local_yy_neg_data::Array{CUFSM.data}
-    CUFSM_dist_pos_data::Array{CUFSM.data}
-    CUFSM_dist_neg_data::Array{CUFSM.data}
-
-    Sxx_pos::Vector{Float64}
-    Sxx_neg::Vector{Float64}
-    My_xx_pos::Vector{Float64}
-    My_xx_neg::Vector{Float64}
-    My_xx::Vector{Float64}
-    Mne_xx::Vector{Float64}
-    Mnℓ_xx_pos::Vector{Float64}
-    Mnℓ_xx_neg::Vector{Float64}
-    eMnℓ_xx_pos::Vector{Float64}
-    eMnℓ_xx_neg::Vector{Float64}
-
-    Syy_pos::Vector{Float64}
-    Syy_neg::Vector{Float64}
-    My_yy_pos::Vector{Float64}
-    My_yy_neg::Vector{Float64}
-    My_yy::Vector{Float64}
-    Mne_yy::Vector{Float64}
-    Mnℓ_yy_pos::Vector{Float64}
-    Mnℓ_yy_neg::Vector{Float64}
-    eMnℓ_yy_pos::Vector{Float64}
-    eMnℓ_yy_neg::Vector{Float64}
-
-    Syy_pos_free_flange::Vector{Float64}
-    Syy_neg_free_flange::Vector{Float64}
-    My_yy_pos_free_flange::Vector{Float64}
-    My_yy_neg_free_flange::Vector{Float64}
-    My_yy_free_flange::Vector{Float64}
-    Mne_yy_free_flange::Vector{Float64}
-    Mnℓ_yy_pos_free_flange::Vector{Float64}
-    Mnℓ_yy_neg_free_flange::Vector{Float64}
-    eMnℓ_yy_pos_free_flange::Vector{Float64}
-    eMnℓ_yy_neg_free_flange::Vector{Float64}
-
-    Bn::Vector{Float64}
-    eBn::Vector{Float64}
-
-    h_flat::Vector{Float64}
-    Fcrv::Vector{Float64}
-    kv::Vector{Float64}
-    Vcr::Vector{Float64}
-    Vn::Vector{Float64}
-    eVn::Vector{Float64}
+    shear_strength::Array{PurlinLine.ShearStrengthData}
 
     web_crippling::Array{PurlinLine.WebCripplingData}
 
@@ -148,45 +74,30 @@ bridging_locations =[0.0, 50.0*12]
 #Create the data structure.
 purlin_line = purlin_line_object()
 
-#Map user inputs to the data structure.
-purlin_line.design_code = design_code
-purlin_line.loading_direction = loading_direction
-purlin_line.segments = segments
-purlin_line.spacing = spacing
-purlin_line.roof_slope = roof_slope
-purlin_line.cross_section_dimensions = cross_section_dimensions
-purlin_line.material_properties = material_properties
-purlin_line.deck_details = deck_details
-purlin_line.deck_material_properties = deck_material_properties
-purlin_line.frame_flange_width = frame_flange_width
-purlin_line.support_locations = support_locations
-purlin_line.bridging_locations = bridging_locations
+#Capture inputs.
+purlin_line.inputs = PurlinLine.Inputs(design_code, loading_direction, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
 
 #CALCULATIONS LAYER
 
-##Calculate properties associated with each purlin line segment.
-
 #Calculate purlin and purlin free flange section properties.
-purlin_line.section_properties, purlin_line.free_flange_section_properties, purlin_line.cross_section_node_geometry, purlin_line.cross_section_element_connectivity, purlin_line.free_flange_cross_section_node_geometry, purlin_line.free_flange_cross_section_element_connectivity = PurlinLine.calculate_purlin_section_properties(purlin_line.cross_section_dimensions)
-
+purlin_line.cross_section_data, purlin_line.free_flange_cross_section_data = PurlinLine.calculate_purlin_section_properties(purlin_line)
 
 #Calculate deck bracing properties. 
-purlin_line.kp, purlin_line.kϕ, purlin_line.kϕ_dist, purlin_line.kx, purlin_line.Lm, purlin_line.Lcrd_AISI = PurlinLine.define_deck_bracing_properties(purlin_line)
+purlin_line.bracing_data = PurlinLine.define_deck_bracing_properties(purlin_line)
 
 #Calculate the critical elastic local buckling and distortional buckling properties for each purlin line segment.
+purlin_line.local_buckling_xx_pos, purlin_line.local_buckling_xx_neg, purlin_line.local_buckling_yy_pos, purlin_line.local_buckling_yy_neg, purlin_line.distortional_buckling_xx_pos, purlin_line.distortional_buckling_xx_neg  = calculate_elastic_buckling_properties(purlin_line)
 
-purlin_line.CUFSM_local_xx_pos_data, purlin_line.CUFSM_local_xx_neg_data, purlin_line.CUFSM_local_yy_pos_data, purlin_line.CUFSM_local_yy_neg_data, purlin_line.CUFSM_dist_pos_data, purlin_line.CUFSM_dist_neg_data, purlin_line.Mcrℓ_xx_pos, purlin_line.Mcrℓ_xx_neg, purlin_line.Mcrℓ_yy_pos, purlin_line.Mcrℓ_yy_neg, purlin_line.Mcrd_pos, purlin_line.Mcrd_neg, purlin_line.Lcrℓ_xx_pos, purlin_line.Lcrℓ_xx_neg, purlin_line.Lcrℓ_yy_pos, purlin_line.Lcrℓ_yy_neg, purlin_line.Lcrd_pos_CUFSM, purlin_line.Lcrd_neg_CUFSM = calculate_elastic_buckling_properties(purlin_line)
+#Calculate the local-global flexural strengths for each purlin line segment.   
+purlin_line.local_global_flexural_strength_xx, purlin_line.local_global_flexural_strength_yy, purlin_line.local_global_flexural_strength_free_flange_yy = calculate_flexural_strength(purlin_line)
 
-
-#Calculate the flexural strengths for each purlin line segment.   
-purlin_line.Sxx_pos, purlin_line.Sxx_neg, purlin_line.My_xx_pos, purlin_line.My_xx_neg, purlin_line.My_xx, purlin_line.Mne_xx, purlin_line.Mnℓ_xx_pos, purlin_line.Mnℓ_xx_neg, purlin_line.eMnℓ_xx_pos, purlin_line.eMnℓ_xx_neg, purlin_line.Syy_pos, purlin_line.Syy_neg, purlin_line.My_yy_pos, purlin_line.My_yy_neg, purlin_line.My_yy, purlin_line.Mne_yy, purlin_line.Mnℓ_yy_pos, purlin_line.Mnℓ_yy_neg, purlin_line.eMnℓ_yy_pos, purlin_line.eMnℓ_yy_neg, purlin_line.Syy_pos_free_flange, purlin_line.Syy_neg_free_flange, purlin_line.My_yy_pos_free_flange, purlin_line.My_yy_neg_free_flange, purlin_line.My_yy_free_flange, purlin_line.Mne_yy_free_flange, purlin_line.Mnℓ_yy_neg_free_flange, purlin_line.eMnℓ_yy_pos_free_flange, purlin_line.eMnℓ_yy_neg_free_flange = calculate_flexural_strength(purlin_line)
+#Need distortional buckling strength!
 
 #Calculate torsion strength for each purlin line segment.
-purlin_line.Bn, purlin_line.eBn = calculate_torsion_strength(purlin_line)
+purlin_line.torsion_strength = calculate_torsion_strength(purlin_line)
 
 #Calculate shear strength for each purlin line segment.
-purlin_line.h_flat, purlin_line.Fcrv, purlin_line.kv, purlin_line.Vcr, purlin_line.Vn, purlin_line.eVn = calculate_shear_strength(purlin_line)
-
+purlin_line.shear_strength = calculate_shear_strength(purlin_line)
 
 #Calculate web crippling strength at each support.
 purlin_line.web_crippling = calculate_web_crippling_strength(purlin_line)
