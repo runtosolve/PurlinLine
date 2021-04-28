@@ -18,9 +18,15 @@ mutable struct purlin_line_object
     distortional_buckling_xx_pos::Array{PurlinLine.ElasticBucklingData}
     distortional_buckling_xx_neg::Array{PurlinLine.ElasticBucklingData}
 
+    yielding_flexural_strength_xx::Array{PurlinLine.YieldingFlexuralStrengthData}
+    yielding_flexural_strength_yy::Array{PurlinLine.YieldingFlexuralStrengthData}
+    yielding_flexural_strength_free_flange_yy::Array{PurlinLine.YieldingFlexuralStrengthData}
+
     local_global_flexural_strength_xx::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
     local_global_flexural_strength_yy::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
     local_global_flexural_strength_free_flange_yy::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
+
+    distortional_flexural_strength_xx::Array{PurlinLine.DistortionalFlexuralStrengthData}
 
     torsion_strength::Array{PurlinLine.TorsionStrengthData}
 
@@ -88,10 +94,14 @@ purlin_line.bracing_data = PurlinLine.define_deck_bracing_properties(purlin_line
 #Calculate the critical elastic local buckling and distortional buckling properties for each purlin line segment.
 purlin_line.local_buckling_xx_pos, purlin_line.local_buckling_xx_neg, purlin_line.local_buckling_yy_pos, purlin_line.local_buckling_yy_neg, purlin_line.distortional_buckling_xx_pos, purlin_line.distortional_buckling_xx_neg  = calculate_elastic_buckling_properties(purlin_line)
 
-#Calculate the local-global flexural strengths for each purlin line segment.   
-purlin_line.local_global_flexural_strength_xx, purlin_line.local_global_flexural_strength_yy, purlin_line.local_global_flexural_strength_free_flange_yy = calculate_flexural_strength(purlin_line)
+#Calculate the first yield flexural strengths for each purlin line segment.  
+purlin_line.yielding_flexural_strength_xx, purlin_line.yielding_flexural_strength_yy, purlin_line.yielding_flexural_strength_free_flange_yy = calculate_yielding_flexural_strength(purlin_line)
 
-#Need distortional buckling strength!
+#Calculate the local-global flexural strengths for each purlin line segment.   
+purlin_line.local_global_flexural_strength_xx, purlin_line.local_global_flexural_strength_yy, purlin_line.local_global_flexural_strength_free_flange_yy = calculate_local_global_flexural_strength(purlin_line)
+
+#Calculate distortional buckling strengths for each purlin line segment.
+purlin_line.distortional_flexural_strength_xx = calculate_distortional_buckling_strength(purlin_line)
 
 #Calculate torsion strength for each purlin line segment.
 purlin_line.torsion_strength = calculate_torsion_strength(purlin_line)
