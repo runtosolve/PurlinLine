@@ -1,10 +1,9 @@
 module PurlinLine
 
-
 using StructuresKit
 
 
-export calculate_purlin_section_properties, deck_pull_through_fastener_stiffness, define_deck_bracing_properties, calculate_elastic_buckling_properties, calculate_yielding_flexural_strength, calculate_local_global_flexural_strength, calculate_distortional_flexural_strength, calculate_torsion_strength, calculate_shear_strength, calculate_web_crippling_strength, WebCripplingData
+export define
 
 
 struct Inputs
@@ -26,6 +25,8 @@ end
 
 struct CrossSectionData
 
+    n::Array{Int64}
+    n_radius::Array{Int64}
     node_geometry::Array{Float64}
     element_definitions::Array{Float64}
     section_properties::CrossSection.SectionProperties
@@ -119,6 +120,42 @@ struct WebCripplingData
 
 end
 
+
+mutable struct PurlinLineObject
+
+    inputs::PurlinLine.Inputs
+
+    cross_section_data::Array{PurlinLine.CrossSectionData}
+    free_flange_cross_section_data::Array{PurlinLine.CrossSectionData}
+
+    bracing_data::Array{PurlinLine.BracingData}
+
+    local_buckling_xx_pos::Array{PurlinLine.ElasticBucklingData}
+    local_buckling_xx_neg::Array{PurlinLine.ElasticBucklingData}
+    local_buckling_yy_pos::Array{PurlinLine.ElasticBucklingData}
+    local_buckling_yy_neg::Array{PurlinLine.ElasticBucklingData}
+    distortional_buckling_xx_pos::Array{PurlinLine.ElasticBucklingData}
+    distortional_buckling_xx_neg::Array{PurlinLine.ElasticBucklingData}
+
+    yielding_flexural_strength_xx::Array{PurlinLine.YieldingFlexuralStrengthData}
+    yielding_flexural_strength_yy::Array{PurlinLine.YieldingFlexuralStrengthData}
+    yielding_flexural_strength_free_flange_yy::Array{PurlinLine.YieldingFlexuralStrengthData}
+
+    local_global_flexural_strength_xx::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
+    local_global_flexural_strength_yy::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
+    local_global_flexural_strength_free_flange_yy::Array{PurlinLine.LocalGlobalFlexuralStrengthData}
+
+    distortional_flexural_strength_xx::Array{PurlinLine.DistortionalFlexuralStrengthData}
+
+    torsion_strength::Array{PurlinLine.TorsionStrengthData}
+
+    shear_strength::Array{PurlinLine.ShearStrengthData}
+
+    web_crippling::Array{PurlinLine.WebCripplingData}
+
+    PurlinLineObject() = new()
+
+end
 
 
 function define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n, n_radius)
@@ -263,7 +300,7 @@ function calculate_purlin_section_properties(purlin_line)
         #Calculate the purlin cross-section properties.
         purlin_section_properties = CrossSection.CUFSMsection_properties(purlin_node_geometry, purlin_element_info)
 
-        cross_section_data[i] = CrossSectionData(purlin_node_geometry, purlin_element_info, purlin_section_properties)
+        cross_section_data[i] = CrossSectionData(n, n_radius, purlin_node_geometry, purlin_element_info, purlin_section_properties)
 
         #Define the purlin free flange discretization.
         n = [4, 4, 4]
@@ -275,7 +312,7 @@ function calculate_purlin_section_properties(purlin_line)
         #Calculate the purlin free flange cross-section properties.
         purlin_free_flange_section_properties = CrossSection.CUFSMsection_properties(purlin_free_flange_node_geometry, purlin_free_flange_element_info)
 
-        free_flange_cross_section_data[i] = CrossSectionData(purlin_free_flange_node_geometry, purlin_free_flange_element_info, purlin_free_flange_section_properties)
+        free_flange_cross_section_data[i] = CrossSectionData(n, n_radius, purlin_free_flange_node_geometry, purlin_free_flange_element_info, purlin_free_flange_section_properties)
 
     end
 
@@ -526,7 +563,8 @@ function calculate_elastic_buckling_properties(purlin_line)
         elem[:, 5] .= ones(num_cross_section_elements) * 100
                                 
                         #lip curve bottom_flange curve web curve top_flange
-        center_top_flange_node = 4 + 4 + 4 + 4 + 4 + 4 + 2 + 1
+        center_top_flange_node =  sum(purlin_line.cross_section_data[section_index].n[1:3]) + sum(purlin_line.cross_section_data[section_index].n_radius[1:3]) + floor(Int, purlin_line.cross_section_data[section_index].n[4]/2) + 1  #This floor command is a little dangerous.
+
         springs = [1 center_top_flange_node 0 purlin_line.bracing_data[i].kx 0 0 purlin_line.bracing_data[i].kϕ_dist 0 0 0]
         constraints = 0
 
@@ -990,6 +1028,48 @@ function calculate_web_crippling_strength(purlin_line)
     end
 
     return web_crippling
+
+end
+
+
+function define(design_code, loading_direction, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+
+    #Create the data structure.
+    purlin_line = PurlinLineObject()
+
+    #Capture inputs.
+    purlin_line.inputs = PurlinLine.Inputs(design_code, loading_direction, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+
+    #CALCULATIONS LAYER
+
+    #Calculate purlin and purlin free flange section properties.
+    purlin_line.cross_section_data, purlin_line.free_flange_cross_section_data = PurlinLine.calculate_purlin_section_properties(purlin_line)
+
+    #Calculate deck bracing properties. 
+    purlin_line.bracing_data = PurlinLine.define_deck_bracing_properties(purlin_line)
+
+    #Calculate the critical elastic local buckling and distortional buckling properties for each purlin line segment.
+    purlin_line.local_buckling_xx_pos, purlin_line.local_buckling_xx_neg, purlin_line.local_buckling_yy_pos, purlin_line.local_buckling_yy_neg, purlin_line.distortional_buckling_xx_pos, purlin_line.distortional_buckling_xx_neg  = calculate_elastic_buckling_properties(purlin_line)
+
+    #Calculate the first yield flexural strengths for each purlin line segment.  
+    purlin_line.yielding_flexural_strength_xx, purlin_line.yielding_flexural_strength_yy, purlin_line.yielding_flexural_strength_free_flange_yy = calculate_yielding_flexural_strength(purlin_line)
+
+    #Calculate the local-global flexural strengths for each purlin line segment.   
+    purlin_line.local_global_flexural_strength_xx, purlin_line.local_global_flexural_strength_yy, purlin_line.local_global_flexural_strength_free_flange_yy = calculate_local_global_flexural_strength(purlin_line)
+
+    #Calculate distortional buckling strengths for each purlin line segment.
+    purlin_line.distortional_flexural_strength_xx = calculate_distortional_flexural_strength(purlin_line)
+
+    #Calculate torsion strength for each purlin line segment.
+    purlin_line.torsion_strength = calculate_torsion_strength(purlin_line)
+
+    #Calculate shear strength for each purlin line segment.
+    purlin_line.shear_strength = calculate_shear_strength(purlin_line)
+
+    #Calculate web crippling strength at each support.
+    purlin_line.web_crippling = calculate_web_crippling_strength(purlin_line)
+
+    return purlin_line
 
 end
 
