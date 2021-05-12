@@ -3,6 +3,7 @@ module PurlinLine
 using StructuresKit
 
 
+
 export define
 
 
@@ -15,7 +16,7 @@ struct Inputs
     roof_slope::Float64
     cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}
     material_properties::Vector{NTuple{4, Float64}}
-    deck_details::Tuple{String, Float64, Float64, Float64, Float64, Float64}
+    deck_details::Tuple{String, Float64, Float64, Float64, Float64}
     deck_material_properties::NTuple{4, Float64}
     frame_flange_width::Float64
     support_locations::Vector{Float64}
@@ -29,7 +30,7 @@ struct CrossSectionData
     n_radius::Array{Int64}
     node_geometry::Array{Float64}
     element_definitions::Array{Float64}
-    section_properties::CrossSection.SectionProperties
+    section_properties::CUFSM.SectionProperties
 
 end
 
@@ -43,6 +44,15 @@ struct BracingData
        Lm::Float64
 
 end
+
+struct FreeFlangeData
+
+    kxf::Float64
+    kϕf::Float64
+    kH::Float64
+
+end
+
 
 struct ElasticBucklingData
 
@@ -129,6 +139,8 @@ mutable struct PurlinLineObject
     free_flange_cross_section_data::Array{PurlinLine.CrossSectionData}
 
     bracing_data::Array{PurlinLine.BracingData}
+
+    free_flange_data::Array{PurlinLine.FreeFlangeData}
 
     local_buckling_xx_pos::Array{PurlinLine.ElasticBucklingData}
     local_buckling_xx_neg::Array{PurlinLine.ElasticBucklingData}
@@ -298,7 +310,7 @@ function calculate_purlin_section_properties(purlin_line)
         purlin_node_geometry, purlin_element_info = define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n, n_radius)
 
         #Calculate the purlin cross-section properties.
-        purlin_section_properties = CrossSection.CUFSMsection_properties(purlin_node_geometry, purlin_element_info)
+        purlin_section_properties = CUFSM.cutwp_prop2(purlin_node_geometry, purlin_element_info)
 
         cross_section_data[i] = CrossSectionData(n, n_radius, purlin_node_geometry, purlin_element_info, purlin_section_properties)
 
@@ -310,7 +322,7 @@ function calculate_purlin_section_properties(purlin_line)
         purlin_free_flange_node_geometry, purlin_free_flange_element_info = define_purlin_free_flange_cross_section(cross_section_type, t, d1, b1, h, α1, α2, α3, r1, r2, n, n_radius)
 
         #Calculate the purlin free flange cross-section properties.
-        purlin_free_flange_section_properties = CrossSection.CUFSMsection_properties(purlin_free_flange_node_geometry, purlin_free_flange_element_info)
+        purlin_free_flange_section_properties = CUFSM.cutwp_prop2(purlin_free_flange_node_geometry, purlin_free_flange_element_info)
 
         free_flange_cross_section_data[i] = CrossSectionData(n, n_radius, purlin_free_flange_node_geometry, purlin_free_flange_element_info, purlin_free_flange_section_properties)
 
@@ -324,6 +336,9 @@ function deck_pull_through_fastener_stiffness(deck_material_properties, b_top, t
 
     #Define the fastener distance from a major R-panel rib.  Hard coded for now.
     x = 25.4 #mm
+
+    #Define the distance of the fastener from the flange pivot point.
+    
 
     #Need this if statement to make sure units are treated propertly here.
     if deck_material_properties[1] == 203255.0
@@ -425,6 +440,7 @@ function define_deck_bracing_properties(purlin_line)
 
             #Define the location from the purlin top flange pivot point to the fastener.  Assume the fastener is centered in the flange.
             c = b_top/2
+            
 
             #Define the distance from the purlin web to the screw location in the top flange.  Assume it is centered in the top flange.
             deck_purlin_fastener_top_flange_location = b_top/2
@@ -475,6 +491,115 @@ function define_deck_bracing_properties(purlin_line)
     return bracing_data
 
 end
+
+
+
+function calculate_free_flange_stiffness(t, E, H, kϕc)
+
+    Icantilever = 1/12*t^3   #length^4/length for distributed spring
+
+    #Use Eq. 16 from Gao and Moen (2013) https://ascelibrary.org/doi/abs/10.1061/(ASCE)ST.1943-541X.0000860
+    kxf = 1/(H^2/kϕc + (H^3/(3*E*Icantilever)))
+
+    #There is some rotational stiffness provided by the flange to the free flange. 
+    kϕf = E*Icantilever/H
+
+    return kxf, kϕf
+
+end
+
+
+function calculate_free_flange_shear_flow_factor(Ix, H, Bc, Dc, t, c, CorZ, xcf)
+
+    #There is shear flow in the free flange of a restrained C or Z.
+    #Use Eq. 13b and 15 from Gao and Moen (2013) https://ascelibrary.org/doi/abs/10.1061/(ASCE)ST.1943-541X.0000860
+    #shear flow s = q*kH where q is the uplift distributed load. 
+    #Define the kH factor here for Cees and Zees.   
+
+    if CorZ == "C"  #C
+
+        b = Bc - c  #distance between center of screw and outside of web
+
+        kH = ((Bc^2*t*H^2)/(4*Ix) + b)/H
+
+        if xcf > 0   #if flange is oriented left to right from web
+            kH = -kH
+        end
+
+
+    elseif CorZ == "Z"  #Z
+
+        kH = (H*t*(Bc^2 + 2*Dc*Bc - (2*Dc^2*Bc)/H))/(4*Ix)
+
+        if xcf > 0   #if flange is oriented left to right from web
+            kH = -kH
+        end
+
+    end
+
+    return kH
+
+end
+
+function calculate_free_flange_shear_flow_properties(purlin_line)
+
+    num_purlin_segments = size(purlin_line.inputs.segments)[1]
+
+    #Initialize a vector that will hold all the outputs.
+    free_flange_data = Array{PurlinLine.FreeFlangeData, 1}(undef, num_purlin_segments)
+
+    for i = 1:num_purlin_segments
+
+        #Define the section property index associated with purlin segment i.
+        section_index = purlin_line.inputs.segments[i][2]
+
+        #Define the material property index associated with purlin segment i.
+        material_index = purlin_line.inputs.segments[i][3]
+
+        #Define base metal thickness.
+        t = purlin_line.inputs.cross_section_dimensions[section_index][2]
+
+        #Define material properties.
+        E = purlin_line.inputs.material_properties[material_index][1]
+
+        #Define full web depth.
+        H = purlin_line.inputs.cross_section_dimensions[section_index][5]
+
+        #Define rotational stiffness provided by the deck connection to the purlin.
+        kϕc = purlin_line.bracing_data[i].kϕ
+
+        kxf, kϕf = calculate_free_flange_stiffness(t, E, H, kϕc)
+
+
+        #Define purlin strong axis centroidal moment of inertia.
+        Ix = purlin_line.cross_section_data[section_index].section_properties.Ixx
+
+        #Define the purlin bottom flange width.
+        Bc = purlin_line.inputs.cross_section_dimensions[section_index][4]
+
+        #Define the purlin bottom flange lip length.
+        Dc = purlin_line.inputs.cross_section_dimensions[section_index][3]
+
+        #Define distance from top flange connection to pivot point.
+        B_top = purlin_line.inputs.cross_section_dimensions[section_index][6]
+        c = B_top/2  ###assume screw is centered in top flange for now 
+
+        #Define cross-section type.
+        CorZ = purlin_line.inputs.cross_section_dimensions[section_index][1]
+
+        #Define x-axis centroid location of free flange.
+        xcf = purlin_line.free_flange_cross_section_data[section_index].section_properties.xc
+
+        kH = calculate_free_flange_shear_flow_factor(Ix, H, Bc, Dc, t, c, CorZ, xcf)
+
+        free_flange_data[i] = FreeFlangeData(kxf, kϕf, kH)
+
+    end
+
+    return free_flange_data
+
+end
+
 
 function get_elastic_buckling(prop, node, elem, lengths, springs, constraints, neigs, P,Mxx,Mzz,M11,M22,A,xcg,zcg,Ixx,Izz,Ixz,thetap,I11,I22,unsymm)
 
@@ -1047,6 +1172,9 @@ function define(design_code, loading_direction, segments, spacing, roof_slope, c
 
     #Calculate deck bracing properties. 
     purlin_line.bracing_data = PurlinLine.define_deck_bracing_properties(purlin_line)
+
+    #Calculate free flange shear flow properties, including bracing stiffness from web and conversion factor from purlin line load to shear flow.
+    purlin_line.free_flange_data = calculate_free_flange_shear_flow_properties(purlin_line)
 
     #Calculate the critical elastic local buckling and distortional buckling properties for each purlin line segment.
     purlin_line.local_buckling_xx_pos, purlin_line.local_buckling_xx_neg, purlin_line.local_buckling_yy_pos, purlin_line.local_buckling_yy_neg, purlin_line.distortional_buckling_xx_pos, purlin_line.distortional_buckling_xx_neg  = calculate_elastic_buckling_properties(purlin_line)
