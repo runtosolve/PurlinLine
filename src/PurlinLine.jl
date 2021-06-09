@@ -2,9 +2,11 @@ module PurlinLine
 
 using StructuresKit
 
+using ..Mesh
+using ..ThinWalledBeam
 
 
-export define
+export define, thin_walled_beam_interface
 
 
 struct Inputs
@@ -164,6 +166,8 @@ mutable struct PurlinLineObject
     shear_strength::Array{PurlinLine.ShearStrengthData}
 
     web_crippling::Array{PurlinLine.WebCripplingData}
+
+    model::ThinWalledBeam.Model
 
     PurlinLineObject() = new()
 
@@ -1157,6 +1161,37 @@ function calculate_web_crippling_strength(purlin_line)
 end
 
 
+function discretize_purlin_line(purlin_line)
+
+    #Define the purlin segment properties.
+    num_purlin_segments = size(purlin_line.inputs.segments)[1]
+
+    #Intialize data structure for ThinWalledBeam member_definitions.
+    member_definitions = Vector{Tuple{Float64, Float64, Int64, Int64, Int64, Int64, Int64}}(undef, num_purlin_segments)
+
+    #Loop over the purlin line segments.
+    for i=1:num_purlin_segments
+
+        L = purlin_line.inputs.segments[i][1]
+        dL = L / 13  #Hard coded for now.
+        section_id = purlin_line.inputs.segments[i][2]
+        material_id = purlin_line.inputs.segments[i][3]
+
+        #L dL section_properties material_properties load_location spring_stiffness spring_location
+        #This is a little tricky. The load_location goes with the purlin cross-section.   The spring_stiffness goes with the purlin_segment.  The spring_location goes with the purlin cross-section.
+                                 #L dL section_properties material_properties load_location spring_stiffness spring_location
+        member_definitions[i] = (L, dL, section_id, material_id, section_id,i, section_id)
+
+    end
+
+    #Add purlin line discretization to purlin_line data structure.
+    dz, z, dm = Mesh.define_line_element(member_definitions)
+
+    return member_definitions, dz, z, dm
+
+end
+
+
 function define(design_code, loading_direction, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
 
     #Create the data structure.
@@ -1169,6 +1204,10 @@ function define(design_code, loading_direction, segments, spacing, roof_slope, c
 
     #Calculate purlin and purlin free flange section properties.
     purlin_line.cross_section_data, purlin_line.free_flange_cross_section_data = PurlinLine.calculate_purlin_section_properties(purlin_line)
+
+    #Discretize purlin line.
+    purlin_line.model = ThinWalledBeam.Model()
+    purlin_line.model.member_definitions, purlin_line.model.dz, purlin_line.model.z, purlin_line.model.dm = discretize_purlin_line(purlin_line)
 
     #Calculate deck bracing properties. 
     purlin_line.bracing_data = PurlinLine.define_deck_bracing_properties(purlin_line)
@@ -1198,6 +1237,105 @@ function define(design_code, loading_direction, segments, spacing, roof_slope, c
     purlin_line.web_crippling = calculate_web_crippling_strength(purlin_line)
 
     return purlin_line
+
+end
+
+
+function thin_walled_beam_interface(purlin_line)
+
+    #Write PurlinLine to ThinWalledBeam interface.
+
+    #inputs
+
+    #Ix Iy Ixy J Cw
+
+    num_purlin_sections = size(purlin_line.inputs.cross_section_dimensions)[1]
+
+    section_properties = Vector{Tuple{Float64, Float64, Float64, Float64, Float64}}(undef, num_purlin_sections)
+
+    for i = 1:num_purlin_sections
+
+        #Note -Ixy here since +y in ThinWalledBeam formulation is pointing down.
+        section_properties[i] = (purlin_line.cross_section_data[i].section_properties.Ixx, purlin_line.cross_section_data[i].section_properties.Iyy, -purlin_line.cross_section_data[i].section_properties.Ixy, purlin_line.cross_section_data[i].section_properties.J, purlin_line.cross_section_data[i].section_properties.Cw)
+
+    end
+
+    num_purlin_materials = size(purlin_line.inputs.material_properties)[1]
+
+    material_properties = Vector{Tuple{Float64, Float64}}(undef, num_purlin_materials)
+
+    for i = 1:num_purlin_materials
+
+        material_properties[i] = (purlin_line.inputs.material_properties[i][1], purlin_line.inputs.material_properties[i][2])
+
+    end
+
+    #Define the lateral and rotational stiffness magnitudes in each purlin segment.
+    num_purlin_segments = size(purlin_line.bracing_data)[1]
+
+    kx_segments = Vector{Float64}(undef, num_purlin_segments)
+    kϕ_segments = Vector{Float64}(undef, num_purlin_segments)
+
+    for i=1:num_purlin_segments
+
+        kx_segments[i] = purlin_line.bracing_data[i].kx 
+        kϕ_segments[i]  = purlin_line.bracing_data[i].kϕ
+
+    end
+
+    #Apply the spring stiffnesses to each node.
+    num_nodes = size(purlin_line.model.z)[1]
+    kx = Mesh.create_line_element_property_array(purlin_line.model.member_definitions, purlin_line.model.dm, purlin_line.model.dz, kx_segments, 6, 1)
+    kϕ = Mesh.create_line_element_property_array(purlin_line.model.member_definitions, purlin_line.model.dm, purlin_line.model.dz, kϕ_segments, 6, 1)
+    spring_stiffness = [kx; kϕ]
+   
+   
+
+
+    #Define the y-distance from the purlin shear center to the lateral translational spring.
+
+    spring_location_segment = Vector{Float64}(undef, num_purlin_sections)
+
+    for i = 1:num_purlin_sections
+
+        ys = purlin_line.cross_section_data[i].section_properties.ys  #distance from bottom fiber of purlin to shear center
+        h = purlin_line.inputs.cross_section_dimensions[i][5]   #out to out purlin height
+
+        spring_location_segment[i] = h - ys  
+
+    end
+
+    #Apply the spring location to each node.
+    ay_kx = Mesh.create_line_element_property_array(purlin_line.model.member_definitions, purlin_line.model.dm, purlin_line.model.dz, spring_location_segment, 7, 1)
+    spring_location = ay_kx
+
+    #Define purlin line support locations.
+    #location where u=v=ϕ=0
+    supports = purlin_line.inputs.support_locations
+
+    #Define purlin line end boundary conditions.
+
+    end_boundary_conditions = Array{Int64}(undef, 2)
+
+    purlin_line_length = sum([purlin_line.inputs.segments[i][1] for i=1:size(purlin_line.inputs.segments)[1]])
+
+    #type=1 u''=v''=ϕ''=0 (simply supported), type=2 u'=v'=ϕ'=0  (fixed), type=3 u''=v''=ϕ''=u'''=v'''=ϕ'''=0 (free end, e.g., a cantilever)
+
+    #z=0 (left) end
+    if supports[1] == 0.0
+        end_boundary_conditions[1] = 1 #pin
+    else
+        end_boundary_conditions[1] = 3  #cantilever
+    end
+
+    #z=purlin_line_length (right) end
+    if supports[end] == purlin_line_length
+        end_boundary_conditions[2] = 1
+    else
+        end_boundary_conditions[2] = 3  #cantilever
+    end
+
+    return section_properties, material_properties, spring_stiffness, spring_location, supports, end_boundary_conditions
 
 end
 
