@@ -3,7 +3,7 @@ using StructuresKit
 
 design_code = "AISI S100-16 ASD"
 
-loading_direction = "gravity"   #or "uplift"
+# loading_direction = "gravity"   #or "uplift"
 
 # Define the properties of each purlin segment along the line.
                 #length, section_properties, material_properties
@@ -38,69 +38,74 @@ support_locations = [0.0, 25.0*12, 50.0*12]
 
 bridging_locations =[0.0, 10.0*12, 50.0*12]
 
-#Add inputs to data structure.
-purlin_line = PurlinLine.define(design_code, loading_direction, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+pressure = 0.001 #kips/in^2
 
-#Prepare ThinWalledBeam inputs.
-section_properties, material_properties, spring_stiffness, spring_location, supports, end_boundary_conditions = PurlinLine.thin_walled_beam_interface(purlin_line)
+#Calculate purlin line design variables from user inputs and store them in the data structure.
+purlin_line = PurlinLine.define(design_code, pressure, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
 
-#Work on loads tomorrow!
-
-
-#Define loads.
-dz, z, dm = Mesh.define_line_element(member_definitions)
-num_nodes = length(z)
-#qx qy
-loads = [(0.001 * ones(num_nodes)), (0.001 * ones(num_nodes))] #kips/in.  
-#ax ay
-load_location = []
-
-#Calculate the distance from the purlin shear center to the applied load point which is assumed to be the center of the top flange.
-
-num_purlin_sections = size(purlin_line.inputs.cross_section_dimensions)[1]
-
-ax_purlin_section = Vector{Float64}(undef, num_purlin_sections)
-ay_purlin_section = Vector{Float64}(undef, num_purlin_sections)
-
-for i = 1:num_purlin_sections
-
-    center_top_flange_node_index = sum(purlin_line.cross_section_data[i].n[1:3]) + sum(purlin_line.cross_section_data[i].n_radius[1:3]) + floor(Int,purlin_line.cross_section_data[i].n[4]/2) + 1
-
-    ax_purlin_section[i] = purlin_line.cross_section_data[i].node_geometry[center_top_flange_node_index, 1] - purlin_line.cross_section_data[1].section_properties.xs
-
-    t = purlin_line.inputs.cross_section_dimensions[i][2]
-
-    ay_purlin_section[i] = (purlin_line.cross_section_data[i].node_geometry[center_top_flange_node_index, 2] + t/2) - purlin_line.cross_section_data[1].section_properties.ys
-
-    
-end
-
-dz, z, dm = Mesh.define_line_element(purlin_line.inputs.member_definitions)
-ax = Mesh.create_line_element_property_array(purlin_line.model.member_definitions, purlin_line.model.dm, dz, ax_purlin_section, 3, 1)
-ay = Mesh.create_line_element_property_array(purlin_line.model.member_definitions, purlin_line.model.dm, dz, ay_purlin_section, 3, 1)
-
-load_location = [ax, ay]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#Translate purlin_line design variables to ThinWalledBeam design variables.
+member_definitions, section_properties, material_properties, spring_stiffness, spring_location, loads, load_locations, end_boundary_conditions, supports = PurlinLine.thin_walled_beam_interface(purlin_line)
 
 
 
 #Define the ThinWalledBeam model.
-model = ThinWalledBeam.define(member_definitions, section_properties, material_properties, spring_stiffness, spring_location, supports, loads, load_location, end_boundary_conditions)
+
+member_definitions, section_properties, material_properties, spring_stiffness, spring_location, supports, loads, load_location, end_boundary_conditions, qx, qy, K,  F, free_dof, Ix, Iy, Ixy, J, Cw, E, ν, G, ax, ay, ay_kx, kx, kϕ, z, dz, dm = ThinWalledBeam.define(purlin_line.model.member_definitions, section_properties, material_properties, spring_stiffness, spring_location, supports, loads, load_location, end_boundary_conditions)
+
+cdm = Model3(member_definitions, section_properties, material_properties, spring_stiffness, spring_location, supports, loads, load_location, end_boundary_conditions, qx, qy, K,  F, free_dof, Ix, Iy, Ixy, J, Cw, E, ν, G, ax, ay, ay_kx, kx, kϕ, z, dz, dm)
+
+
+mutable struct Model3
+
+    member_definitions::Vector{Tuple{Float64, Float64, Int64, Int64, Int64, Int64, Int64}}
+    section_properties::Vector{Tuple{Float64, Float64, Float64, Float64, Float64}}
+    material_properties::Vector{Tuple{Float64, Float64}}
+    spring_stiffness::Vector{Vector{Float64}}
+    spring_location::Vector{Float64}
+    supports::Array{Float64}
+    loads::Vector{Vector{Float64}}
+    load_location::Vector{Vector{Float64}}
+    end_boundary_conditions::Array{Int64}
+ 
+    qx::Array{Float64}
+    qy::Array{Float64}
+ 
+    K::Matrix{Float64}
+    F::Array{Float64}
+ 
+    free_dof::Array{Int64}
+    
+    Ix::Array{Float64}
+    Iy::Array{Float64}
+    Ixy::Array{Float64}
+    J::Array{Float64}
+    Cw::Array{Float64}
+    E::Array{Float64}
+    ν::Array{Float64}
+    G::Array{Float64}
+    ax::Array{Float64}
+    ay::Array{Float64}
+    ay_kx::Array{Float64}
+    kx::Array{Float64}
+    kϕ::Array{Float64}
+ 
+    z::Array{Float64}
+    dz::Array{Float64}
+    dm::Array{Int64}
+    
+    # u::Array{Float64}
+    # v::Array{Float64}
+    # ϕ::Array{Float64}
+ 
+    # Model() = new()
+ 
+ end
+
+
+
+
+
+
 
 #Solve the ThinWalledBeam model.
 model = ThinWalledBeam.solve(model)
