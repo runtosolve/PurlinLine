@@ -12,8 +12,8 @@ spring_stiffness = [(0.0,300/1000)]
 #ay_kx
 spring_location = [(101.6)]
 
-#qx qy
-loads = [(0.0001, 0.00002)]
+#qx qy start end
+loads = [(0.0001, 0.00002, 0.0, 7620.0)]
 
 #ax ay
 load_locations = [(27.826,101.6)]
@@ -30,11 +30,23 @@ supports = [0.0 7620]
 #L(1) dL(2) section_properties(3) material_properties(4) spring_stiffness(5) spring_location(6) load(7) load_location(8) 
 member_definitions = [(7620, 7620/12, 1, 1, 1, 1, 1, 1)]
 
-#Define model inputs.
-model = ThinWalledBeam.user_interface(member_definitions, section_properties, material_properties, spring_stiffness, spring_location, loads, load_locations, end_boundary_conditions, supports)
+#Discretize beam.
+z, m = ThinWalledBeam.discretize(member_definitions)
 
-#Calculate model stiffness and external force.
-model = ThinWalledBeam.define(model)
+#Apply loads.
+num_nodes = length(z)
+qx = 0.001 * ones(num_nodes)
+qy = 0.001 * ones(num_nodes)
+ax = 27.8 * ones(num_nodes)
+ay = 101.6 * ones(num_nodes)
+
+#Define springs.
+kx = 0.0 * ones(num_nodes)
+kϕ = 0.3 * ones(num_nodes)
+ay_kx = 101.6 * ones(num_nodes)
+
+#Define model.
+model = ThinWalledBeam.define(z, m, member_definitions, section_properties, material_properties, kx, kϕ, ay_kx, qx, qy, ax, ay, end_boundary_conditions, supports)
 
 #Solve model.
 model = ThinWalledBeam.solve(model)
