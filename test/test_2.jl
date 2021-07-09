@@ -45,6 +45,7 @@ kx = 0.0 * ones(num_nodes)
 kϕ = 0.3 * ones(num_nodes)
 ay_kx = 101.6 * ones(num_nodes)
 
+
 #Define model.
 model = ThinWalledBeam.define(z, m, member_definitions, section_properties, material_properties, kx, kϕ, ay_kx, qx, qy, ax, ay, end_boundary_conditions, supports)
 
