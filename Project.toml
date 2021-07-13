@@ -7,3 +7,9 @@ version = "0.1.0"
 NumericalIntegration = "e7bfaba1-d571-5449-8927-abc22e82249b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructuresKit = "f6c18a9d-8941-4a0a-88a3-c5fc4dcc4715"
+
+[compat]
+NumericalIntegration = "0.2.0"
+StaticArrays = "0.12.5"
+StructuresKit = "v0.1.5"
+julia = "1.6.1"

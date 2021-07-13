@@ -1,12 +1,11 @@
 module PurlinLine
 
-using Base: String
+using Base: String, Float64
 using StructuresKit
 
 using NumericalIntegration
 
-
-export define, analysis, capacity, CrossSectionData, calculate_purlin_section_properties, PurlinLineObject, BracingData, calculate_free_flange_shear_flow_properties, YieldingFlexuralStrengthData, LocalGlobalFlexuralStrengthData, DistortionalFlexuralStrengthData, TorsionStrengthData, ShearStrengthData, WebCripplingData, InternalForceData, Reactions, DemandToCapacity, discretize_purlin_line
+export define, analysis, test
 
 
 struct Inputs
@@ -25,13 +24,16 @@ struct Inputs
 
 end
 
-struct CrossSectionData
+
+
+Base.@kwdef struct CrossSectionData
 
     n::Array{Int64}
     n_radius::Array{Int64}
     node_geometry::Array{Float64}
     element_definitions::Array{Float64}
     section_properties::CUFSM.SectionProperties
+    plastic_section_properties::Union{StructuresKit.CrossSection.PlasticSectionProperties, Nothing} = nothing
 
 end
 
@@ -134,13 +136,31 @@ end
 
 struct DemandToCapacity
 
-    DC_flexure_torsion::Array{Float64}
-    DC_distortional::Array{Float64}
-    DC_flexure_shear::Array{Float64}
-    DC_biaxial_bending::Array{Float64}
-    DC_web_crippling::Array{Float64}
+    flexure_torsion::Array{Float64}
+    distortional::Array{Float64}
+    flexure_shear::Array{Float64}
+    biaxial_bending::Array{Float64}
+    web_crippling::Array{Float64}
 
 end
+
+struct FlexureTorsion_DemandToCapacity_Data
+    
+    action_Mx::Array{Float64}
+    action_My::Array{Float64}
+    action_B::Array{Float64}
+    action_My_freeflange::Array{Float64}
+    interaction::Array{Float64}
+
+end
+
+struct BiaxialBending_DemandToCapacity_Data
+    
+    action_P::Array{Float64}
+    action_Mxx::Array{Float64}
+    action_Myy::Array{Float64}
+    interaction::Array{Float64}
+
 
 struct InternalForceData
 
@@ -159,6 +179,18 @@ struct Reactions
     Fyy::Array{Float64}
 
 end
+
+struct ExpectedStrengths
+
+    eMnℓ_xx
+    eMnℓ_yy
+    eMnℓ_yy_free_flange
+    eMnd_xx
+    eVn
+    eBn
+
+end
+
 
 
 mutable struct PurlinLineObject
@@ -208,6 +240,11 @@ mutable struct PurlinLineObject
     free_flange_internal_forces::InternalForceData
 
     support_reactions::Reactions
+
+    flexure_torsion_DC_data::FlexureTorsion_DemandToCapacity_Data
+    biaxial_bending_DC_data::BiaxialBending_DemandToCapacity_Data
+
+    expected_strengths::ExpectedStrengths
 
     demand_to_capacity::DemandToCapacity
 
@@ -354,10 +391,17 @@ function define_purlin_section(cross_section_dimensions, n, n_radius)
         #Define the purlin cross-section nodes and elements.
         purlin_node_geometry, purlin_element_info = define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n, n_radius)
 
-        #Calculate the purlin cross-section properties.
+        #Calculate the purlin elastic cross-section properties.
         purlin_section_properties = CUFSM.cutwp_prop2(purlin_node_geometry, purlin_element_info)
 
-        cross_section_data[i] = CrossSectionData(n, n_radius, purlin_node_geometry, purlin_element_info, purlin_section_properties)
+        #Calculate purlin plastic neutral axis and plastic modulus.
+        n_plastic = n .* 10   #Use a fine discretization to find the plastic section properties.
+        purlin_plastic_node_geometry, purlin_plastic_element_info = define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n_plastic, n_radius)
+
+        about_axis = "x"  #The strong axis plastic properties are needed for now.  
+        purlin_plastic_section_properties = StructuresKit.CrossSection.calculate_plastic_section_properties(purlin_plastic_node_geometry, purlin_plastic_element_info, about_axis)
+
+        cross_section_data[i] = CrossSectionData(n, n_radius, purlin_node_geometry, purlin_element_info, purlin_section_properties, purlin_plastic_section_properties)
        
     end
 
@@ -397,7 +441,7 @@ function define_purlin_free_flange_section(cross_section_dimensions, n, n_radius
         #Calculate the purlin free flange cross-section properties.
         purlin_free_flange_section_properties = CUFSM.cutwp_prop2(purlin_free_flange_node_geometry, purlin_free_flange_element_info)
 
-        free_flange_cross_section_data[i] = CrossSectionData(n, n_radius, purlin_free_flange_node_geometry, purlin_free_flange_element_info, purlin_free_flange_section_properties)
+        free_flange_cross_section_data[i] = CrossSectionData(n, n_radius, purlin_free_flange_node_geometry, purlin_free_flange_element_info, purlin_free_flange_section_properties, nothing)
 
     end
 
@@ -991,11 +1035,48 @@ function calculate_local_global_flexural_strength(purlin_line)
 
     for i = 1:num_purlin_segments
 
+        #Define the material property index associated with purlin segment i.
+        material_index = purlin_line.inputs.segments[i][3]
+
+        #Define the section property index associated with purlin segment i.
+        section_index = purlin_line.inputs.segments[i][2]
+
         Mne_xx = purlin_line.yielding_flexural_strength_xx[i].My  #handle global buckling in the ThinWalledBeam second order analysis
+        
+        Mcrℓ_xx_pos = purlin_line.local_buckling_xx_pos[i].Mcr
+        λ_ℓ_pos = sqrt(Mne_xx/Mcrℓ_xx_pos)
 
-        Mnℓ_xx_pos, eMnℓ_xx_pos =  AISIS10016.f321(Mne_xx, purlin_line.local_buckling_xx_pos[i].Mcr, ASDorLRFD)
+        if λ_ℓ_pos < 0.776   #inelastic reserve is in play
 
-        Mnℓ_xx_neg, eMnℓ_xx_neg =  AISIS10016.f321(Mne_xx, purlin_line.local_buckling_xx_neg[i].Mcr, ASDorLRFD)
+            Sc = purlin_line.yielding_flexural_strength_xx[i].S_pos
+            St = purlin_line.yielding_flexural_strength_xx[i].S_neg
+            Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
+            Fy = purlin_line.inputs.material_properties[material_index][3]
+            lambda_l, Cyl, Mp, Myc, Myt3, Mnℓ_xx_pos, eMnℓ_xx_pos = AISIS10016.f323(Mne_xx, Mcrℓ_xx_pos, Sc, St, Z, Fy, ASDorLRFD)
+
+        else   #no inelastic reserve
+
+            Mnℓ_xx_pos, eMnℓ_xx_pos =  AISIS10016.f321(Mne_xx, purlin_line.local_buckling_xx_pos[i].Mcr, ASDorLRFD)
+
+        end
+
+
+        Mcrℓ_xx_neg = purlin_line.local_buckling_xx_neg[i].Mcr
+        λ_ℓ_neg = sqrt(Mne_xx/Mcrℓ_xx_neg)
+
+        if λ_ℓ_neg < 0.776   #inelastic reserve is in play
+
+            Sc = purlin_line.yielding_flexural_strength_xx[i].S_neg
+            St = purlin_line.yielding_flexural_strength_xx[i].S_pos
+            Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
+            Fy = purlin_line.inputs.material_properties[material_index][3]
+            lambda_l, Cyl, Mp, Myc, Myt3, Mnℓ_xx_neg, eMnℓ_xx_neg = AISIS10016.f323(Mne_xx, Mcrℓ_xx_neg, Sc, St, Z, Fy, ASDorLRFD)
+
+        else   #no inelastic reserve
+
+            Mnℓ_xx_neg, eMnℓ_xx_neg =  AISIS10016.f321(Mne_xx, purlin_line.local_buckling_xx_neg[i].Mcr, ASDorLRFD)
+
+        end
 
         local_global_flexural_strength_xx[i] = LocalGlobalFlexuralStrengthData(Mne_xx, Mnℓ_xx_pos, Mnℓ_xx_neg, eMnℓ_xx_pos, eMnℓ_xx_neg)
 
@@ -1039,11 +1120,51 @@ function calculate_distortional_flexural_strength(purlin_line)
         ASDorLRFD = 1
     end
 
+
     for i = 1:num_purlin_segments
 
-        Mnd_xx_pos, eMnd_xx_pos = AISIS10016.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_pos[i].Mcr, ASDorLRFD)
+        #Define the material property index associated with purlin segment i.
+        material_index = purlin_line.inputs.segments[i][3]
 
-        Mnd_xx_neg, eMnd_xx_neg = AISIS10016.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_neg[i].Mcr, ASDorLRFD)
+        My = purlin_line.yielding_flexural_strength_xx[i].My
+        Mcrd_xx_pos = purlin_line.distortional_buckling_xx_pos[i].Mcr
+        λ_d_pos = sqrt(My/Mcrd_xx_pos)
+
+
+        if λ_d_pos < 0.673   #inelastic reserve is in play
+
+            Sc = purlin_line.yielding_flexural_strength_xx[i].S_pos
+            St = purlin_line.yielding_flexural_strength_xx[i].S_neg
+            Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
+            Fy = purlin_line.inputs.material_properties[material_index][3]
+
+            lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_pos, eMnd_xx_pos = AISIS10016.f43(My, Mcrd_xx_pos, Sc, St, Z, Fy, ASDorLRFD)
+
+        else
+
+            
+            Mnd_xx_pos, eMnd_xx_pos = AISIS10016.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_pos[i].Mcr, ASDorLRFD)
+
+        end
+
+        Mcrd_xx_neg = purlin_line.distortional_buckling_xx_neg[i].Mcr
+        λ_d_neg = sqrt(My/Mcrd_xx_neg)
+
+
+        if λ_d_neg < 0.673   #inelastic reserve is in play
+
+            Sc = purlin_line.yielding_flexural_strength_xx[i].S_neg  #compression is associated with negative moment here
+            St = purlin_line.yielding_flexural_strength_xx[i].S_pos
+            Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
+            Fy = purlin_line.inputs.material_properties[material_index][3]
+
+            lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_neg, eMnd_xx_neg = AISIS10016.f43(My, Mcrd_xx_neg, Sc, St, Z, Fy, ASDorLRFD)
+
+        else
+
+            Mnd_xx_neg, eMnd_xx_neg = AISIS10016.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_neg[i].Mcr, ASDorLRFD)
+
+        end
 
         distortional_flexural_strength_xx[i] = DistortionalFlexuralStrengthData(Mnd_xx_pos, Mnd_xx_neg, eMnd_xx_pos, eMnd_xx_neg)
 
@@ -1267,6 +1388,12 @@ function discretize_purlin_line(purlin_line)
 
 end
 
+
+"""
+    define(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+
+Returns a PurlinLine model built from user inputs.
+"""
 
 function define(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
 
@@ -1603,19 +1730,6 @@ function beam_column_interface(purlin_line)
 end
 
 
-function bending_torsion_DC(Mxx, Myy, B, Myy_free_flange, eMnℓ_xx, eMnℓ_yy, eBn, eMnℓ_yy_free_flange)
-
-    #check bending + torsion interaction
-    #ActionM1, ActionM2, ActionB, Interaction
-    action_Mxx, action_Myy, action_B, action_Myy_free_flange, interaction = AISIS10024.h42(Mxx, Myy, B, Myy_free_flange, eMnℓ_xx, eMnℓ_yy, eBn, eMnℓ_yy_free_flange)
-
-    DC = interaction / 1.15   #Consider updating this 1.15 in the future.
-
-    return action_Mxx, action_Myy, action_B, action_Myy_free_flange, interaction, DC
-
-end
-
-
 function calculate_flexural_capacity_envelope(m, eMn_pos, eMn_neg, M)
 
     num_nodes = length(m)
@@ -1643,7 +1757,7 @@ function calculate_flexural_capacity_envelope(m, eMn_pos, eMn_neg, M)
 
 end
 
-function calculate_bending_torsion_DC(purlin_line)
+function calculate_flexure_torsion_DC(purlin_line)
 
     num_purlin_segments = size(purlin_line.inputs.segments)[1]
     num_nodes = length(purlin_line.model.z)
@@ -1665,13 +1779,16 @@ function calculate_bending_torsion_DC(purlin_line)
     eMnℓ_yy_free_flange_all = zeros(Float64, num_nodes)
     eMnℓ_yy_free_flange_all .= eMnℓ_yy_free_flange_range[purlin_line.model.m]
 
-    results = AISIS10024.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, purlin_line.free_flange_internal_forces.Myy, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
+    action_Mx, action_My, action_B, action_My_freeflange, interaction = AISIS10024.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, purlin_line.free_flange_internal_forces.Myy, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
 
     interaction = [results[i][5] for i=1:num_nodes]
 
     DC = interaction ./ 1.15   #Consider updating this 1.15 in the future based on AISI COS discussions.
 
-    return DC
+    #Grab all this info and put in a data structure.
+    flexure_torsion_DC_data = FlexureTorsion_DemandToCapacity_Data(action_Mx, action_My, action_B, action_My_freeflange, interaction)
+
+    return DC, flexure_torsion_DC_data, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all
 
 end
 
@@ -1688,7 +1805,7 @@ function calculate_distortional_buckling_DC(purlin_line)
     #check distortional buckling
     DC = abs.(purlin_line.internal_forces.Mxx./eMnd_xx_all)
 
-    return DC
+    return DC, eMnd_xx_all
 
 end
 
@@ -1710,7 +1827,7 @@ function calculate_flexure_shear_DC(purlin_line)
 
     DC = interaction
 
-    return DC
+    return DC, eMnℓ_xx_all, eVn_all
 
 end
 
@@ -1740,7 +1857,10 @@ function calculate_biaxial_bending_DC(purlin_line)
 
     DC = interaction
 
-    return DC
+     #Grab all this info and put in a data structure.
+     biaxial_bending_DC_data = BiaxialBending_DemandToCapacity_Data(action_P, action_Mxx, action_Myy, interaction)
+
+    return DC, biaxial_bending_DC_data, eMnℓ_xx_all, eMnℓ_yy_all 
 
 end
 
@@ -1818,6 +1938,12 @@ function calculate_internal_forces(model)
 
 end
 
+"""
+    analysis(purlin_line)
+
+Returns the PurlinLine structural response to an applied pressure.
+"""
+
 function analysis(purlin_line)
 
     #Translate purlin_line design variables to ThinWalledBeam design variables.
@@ -1864,14 +1990,16 @@ function analysis(purlin_line)
     purlin_line.free_flange_internal_forces = InternalForceData(Pf, Mxx, Myy, Vxx, Vyy, T, B)
 
     #Calculate demand-to-capacity ratios for each of the purlin line limit states.
-    DC_flexure_torsion = calculate_bending_torsion_DC(purlin_line)
-    DC_distortional = calculate_distortional_buckling_DC(purlin_line)
-    DC_flexure_shear = calculate_flexure_shear_DC(purlin_line)        
-    DC_biaxial_bending = calculate_biaxial_bending_DC(purlin_line)
+    DC_flexure_torsion, purlin_line.flexure_torsion_DC_data, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all = calculate_flexure_torsion_DC(purlin_line)
+    DC_distortional, eMnd_xx_all = calculate_distortional_buckling_DC(purlin_line)
+    DC_flexure_shear, eMnℓ_xx_all, eVn_all = calculate_flexure_shear_DC(purlin_line)        
+    DC_biaxial_bending, purlin_line.biaxial_bending_DC_data, eMnℓ_xx_all, eMnℓ_yy_all = calculate_biaxial_bending_DC(purlin_line)
     DC_web_crippling = calculate_web_crippling_DC(purlin_line)
 
     #Add demand-to-capacity ratios to data structure.
     purlin_line.demand_to_capacity = DemandToCapacity(DC_flexure_torsion, DC_distortional, DC_flexure_shear, DC_biaxial_bending, DC_web_crippling)
+
+
 
     return purlin_line
 
@@ -1953,8 +2081,13 @@ function identify_failure_limit_state(purlin_line)
 
 end
 
+"""
+    test(purlin_line)
 
-function capacity(purlin_line)
+Returns the PurlinLine failure pressure, failure location, and failure limit state.
+"""
+
+function test(purlin_line)
 
     DC_tolerance = 0.01  
     

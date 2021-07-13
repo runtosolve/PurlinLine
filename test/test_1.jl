@@ -38,7 +38,6 @@ bridging_locations =[0.0, 10.0*12, 50.0*12]
 
 #Calculate purlin line design variables from user inputs and store them in the data structure.
 purlin_line = PurlinLine.define(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
-
 # purlin_line.applied_pressure = 10 / 1000 / 144 #psf to kips/in^2
 
 purlin_line.loading_direction = "uplift"
