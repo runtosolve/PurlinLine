@@ -134,23 +134,14 @@ struct WebCripplingData
 
 end
 
-struct DemandToCapacity
-
-    flexure_torsion::Array{Float64}
-    distortional::Array{Float64}
-    flexure_shear::Array{Float64}
-    biaxial_bending::Array{Float64}
-    web_crippling::Array{Float64}
-
-end
-
 struct FlexureTorsion_DemandToCapacity_Data
     
-    action_Mx::Array{Float64}
-    action_My::Array{Float64}
+    action_Mxx::Array{Float64}
+    action_Myy::Array{Float64}
     action_B::Array{Float64}
-    action_My_freeflange::Array{Float64}
+    action_Myy_freeflange::Array{Float64}
     interaction::Array{Float64}
+    demand_to_capacity::Array{Float64}
 
 end
 
@@ -160,6 +151,9 @@ struct BiaxialBending_DemandToCapacity_Data
     action_Mxx::Array{Float64}
     action_Myy::Array{Float64}
     interaction::Array{Float64}
+    demand_to_capacity::Array{Float64}
+
+end
 
 
 struct InternalForceData
@@ -182,12 +176,12 @@ end
 
 struct ExpectedStrengths
 
-    eMnℓ_xx
-    eMnℓ_yy
-    eMnℓ_yy_free_flange
-    eMnd_xx
-    eVn
-    eBn
+    eMnℓ_xx::Array{Float64}
+    eMnℓ_yy::Array{Float64}
+    eMnℓ_yy_free_flange::Array{Float64}
+    eMnd_xx::Array{Float64}
+    eVn::Array{Float64}
+    eBn::Array{Float64}
 
 end
 
@@ -241,12 +235,13 @@ mutable struct PurlinLineObject
 
     support_reactions::Reactions
 
-    flexure_torsion_DC_data::FlexureTorsion_DemandToCapacity_Data
-    biaxial_bending_DC_data::BiaxialBending_DemandToCapacity_Data
+    flexure_torsion_demand_to_capacity::FlexureTorsion_DemandToCapacity_Data
+    biaxial_bending_demand_to_capacity::BiaxialBending_DemandToCapacity_Data
+    distortional_demand_to_capacity::Array{Float64}
+    flexure_shear_demand_to_capacity::Array{Float64}
+    web_crippling_demand_to_capacity::Array{Float64}
 
     expected_strengths::ExpectedStrengths
-
-    demand_to_capacity::DemandToCapacity
 
     failure_limit_state::String
 
@@ -1004,6 +999,8 @@ function calculate_yielding_flexural_strength(purlin_line)
             ASDorLRFD = 0
         elseif purlin_line.inputs.design_code == "AISI S100-16 LRFD"
             ASDorLRFD = 1
+        else 
+            ASDorLRFD = 2   #nominal
         end
 
         Mcrℓ_yy_free_flange = 10.0^10 #Make this a big number so we just get back eMy
@@ -1031,6 +1028,8 @@ function calculate_local_global_flexural_strength(purlin_line)
         ASDorLRFD = 0
     elseif purlin_line.inputs.design_code == "AISI S100-16 LRFD"
         ASDorLRFD = 1
+    else
+        ASDorLRFD = 2   #nominal
     end
 
     for i = 1:num_purlin_segments
@@ -1118,6 +1117,8 @@ function calculate_distortional_flexural_strength(purlin_line)
         ASDorLRFD = 0
     elseif purlin_line.inputs.design_code == "AISI S100-16 LRFD"
         ASDorLRFD = 1
+    else
+        ASDorLRFD = 2   #nominal
     end
 
 
@@ -1185,6 +1186,8 @@ function calculate_torsion_strength(purlin_line)
         ASDorLRFD = 0
     elseif purlin_line.inputs.design_code == "AISI S100-16 LRFD"
         ASDorLRFD = 1
+    else
+        ASDorLRFD = 2  #nominal
     end
 
     for i = 1:num_purlin_segments
@@ -1223,6 +1226,8 @@ function calculate_shear_strength(purlin_line)
         ASDorLRFD = 0
     elseif purlin_line.inputs.design_code == "AISI S100-16 LRFD"
         ASDorLRFD = 1
+    else
+        ASDorLRFD = 2  #nominal
     end
 
     for i = 1:num_purlin_segments
@@ -1371,7 +1376,7 @@ function discretize_purlin_line(purlin_line)
     for i=1:num_purlin_segments
 
         L = purlin_line.inputs.segments[i][1]
-        dL = L / 13  #Hard coded for now.
+        dL = L / 20  #Hard coded for now.
         section_id = purlin_line.inputs.segments[i][2]
         material_id = purlin_line.inputs.segments[i][3]
 
@@ -1686,14 +1691,6 @@ function beam_column_interface(purlin_line)
 
     #The shear flow is applied at the free flange centerline.  The distance ay in StructuresKit.BeamColumn is the distance from the shear center to the load along the centroidal y-axis.   Since the shear center for just the free flange is close to the free flange centerline, assume ay= 0.  
     
-    # ycf = [purlin_line.free_flange_cross_section_data[i].section_properties.yc for i=1:num_purlin_sections]
-
-    # ysf = [purlin_line.free_flange_cross_section_data[i].section_properties.ys for i=1:num_purlin_sections]
-
-    # ay_sections = ycf .- ysf
-
-    # ayf = Mesh.create_line_element_property_array(member_definitions, purlin_line.model.m, dz, ay_sections, 3, 1)
-
     ayf = zeros(Float64, num_nodes)
 
     #There is no qyf so this can be set to zero.
@@ -1757,7 +1754,7 @@ function calculate_flexural_capacity_envelope(m, eMn_pos, eMn_neg, M)
 
 end
 
-function calculate_flexure_torsion_DC(purlin_line)
+function calculate_flexure_torsion_demand_to_capacity(purlin_line)
 
     num_purlin_segments = size(purlin_line.inputs.segments)[1]
     num_nodes = length(purlin_line.model.z)
@@ -1779,23 +1776,26 @@ function calculate_flexure_torsion_DC(purlin_line)
     eMnℓ_yy_free_flange_all = zeros(Float64, num_nodes)
     eMnℓ_yy_free_flange_all .= eMnℓ_yy_free_flange_range[purlin_line.model.m]
 
-    action_Mx, action_My, action_B, action_My_freeflange, interaction = AISIS10024.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, purlin_line.free_flange_internal_forces.Myy, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
+    results = AISIS10024.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, purlin_line.free_flange_internal_forces.Myy, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
 
-    interaction = [results[i][5] for i=1:num_nodes]
+    action_Mx = [x[1] for x in results]
+    action_My = [x[2] for x in results]
+    action_B = [x[3] for x in results]
+    action_My_freeflange = [x[4] for x in results]
+    interaction = [x[5] for x in results]
 
-    DC = interaction ./ 1.15   #Consider updating this 1.15 in the future based on AISI COS discussions.
+    demand_to_capacity = interaction ./ 1.15   #Consider updating this 1.15 in the future based on AISI COS discussions.
 
-    #Grab all this info and put in a data structure.
-    flexure_torsion_DC_data = FlexureTorsion_DemandToCapacity_Data(action_Mx, action_My, action_B, action_My_freeflange, interaction)
+    flexure_torsion_demand_to_capacity = FlexureTorsion_DemandToCapacity_Data(action_Mx, action_My, action_B, action_My_freeflange, interaction, demand_to_capacity)
 
-    return DC, flexure_torsion_DC_data, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all
+    return flexure_torsion_demand_to_capacity, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all
 
 end
 
 
 
 #find distortional buckling D/C
-function calculate_distortional_buckling_DC(purlin_line)
+function calculate_distortional_buckling_demand_to_capacity(purlin_line)
 
     num_purlin_segments = size(purlin_line.inputs.segments)[1]
     eMnd_xx_pos_range = [purlin_line.distortional_flexural_strength_xx[i].eMnd_pos for i=1:num_purlin_segments]
@@ -1803,14 +1803,14 @@ function calculate_distortional_buckling_DC(purlin_line)
     eMnd_xx_all = calculate_flexural_capacity_envelope(purlin_line.model.m, eMnd_xx_pos_range, eMnd_xx_neg_range, purlin_line.internal_forces.Mxx)
 
     #check distortional buckling
-    DC = abs.(purlin_line.internal_forces.Mxx./eMnd_xx_all)
+    distortional_demand_to_capacity = abs.(purlin_line.internal_forces.Mxx./eMnd_xx_all)
 
-    return DC, eMnd_xx_all
+    return distortional_demand_to_capacity, eMnd_xx_all
 
 end
 
 #find flexure+shear D/C
-function calculate_flexure_shear_DC(purlin_line)
+function calculate_flexure_shear_demand_to_capacity(purlin_line)
 
     num_purlin_segments = size(purlin_line.inputs.segments)[1]
     num_nodes = length(purlin_line.model.z)
@@ -1823,17 +1823,15 @@ function calculate_flexure_shear_DC(purlin_line)
     eVn_all = zeros(Float64, num_nodes)
     eVn_all .= eVn_range[purlin_line.model.m]
 
-    interaction = AISIS10016.h21.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Vyy, eMnℓ_xx_all, eVn_all)
+    flexure_shear_demand_to_capacity = AISIS10016.h21.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Vyy, eMnℓ_xx_all, eVn_all)
 
-    DC = interaction
-
-    return DC, eMnℓ_xx_all, eVn_all
+    return flexure_shear_demand_to_capacity, eMnℓ_xx_all, eVn_all
 
 end
 
 
 #find biaxial bending D/C
-function calculate_biaxial_bending_DC(purlin_line)
+function calculate_biaxial_bending_demand_to_capacity(purlin_line)
 
     #no axial force calculations for now.
     num_nodes = length(purlin_line.model.z)
@@ -1850,17 +1848,17 @@ function calculate_biaxial_bending_DC(purlin_line)
 
     results = AISIS10016.h121.(purlin_line.internal_forces.P, purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, Pa, eMnℓ_xx_all, eMnℓ_yy_all)
 
-    actionP = [x[1] for x in results]
-    actionMxx = [x[2] for x in results]
-    actionMyy = [x[3] for x in results]
+    action_P = [x[1] for x in results]
+    action_Mxx = [x[2] for x in results]
+    action_Myy = [x[3] for x in results]
     interaction = [x[4] for x in results]
 
-    DC = interaction
+    demand_to_capacity = interaction
 
      #Grab all this info and put in a data structure.
-     biaxial_bending_DC_data = BiaxialBending_DemandToCapacity_Data(action_P, action_Mxx, action_Myy, interaction)
+     biaxial_bending_demand_to_capacity = BiaxialBending_DemandToCapacity_Data(action_P, action_Mxx, action_Myy, interaction, demand_to_capacity)
 
-    return DC, biaxial_bending_DC_data, eMnℓ_xx_all, eMnℓ_yy_all 
+    return biaxial_bending_demand_to_capacity, eMnℓ_xx_all, eMnℓ_yy_all 
 
 end
 
@@ -1897,7 +1895,7 @@ function calculate_support_reactions(purlin_line)
 end
 
 
-function calculate_web_crippling_DC(purlin_line)
+function calculate_web_crippling_demand_to_capacity(purlin_line)
 
     num_supports = length(purlin_line.inputs.support_locations)
 
@@ -1971,7 +1969,26 @@ function analysis(purlin_line)
     Pf = calculate_free_flange_axial_force(Mxx, member_definitions, purlin_line)
 
     #Apply the shear flow based on the y-direction load along the purlin line free flange model.
-    qxf = qy .* kH
+
+    #For a Z section, assume qxf = T/h where h is the purlin height.
+    #Define out-to-out purlin web depth.
+
+    num_purlin_sections = size(purlin_line.inputs.cross_section_dimensions)[1]
+
+    h_section = Array{Float64}(undef, num_purlin_sections)
+
+    for i = 1:num_purlin_sections
+
+        h_section[i] = purlin_line.inputs.cross_section_dimensions[i][5]
+
+    end
+
+    dz = diff(z)
+    h = Mesh.create_line_element_property_array(member_definitions, m, dz, h_section, 3, 1)
+
+    # qxf = qy .* kH
+    #Convert torsion T along member to distributed torque, then divide by the purlin height to approximate force in free flange.
+    qxf = -T ./ [dz[1]/2; dz[1:end-1]/2 .+ dz[2:end]/2; dz[end]/2] ./ h 
 
     #The y-direction load is assumed to be zero in the free flange model.
     num_nodes = length(z)
@@ -1990,32 +2007,30 @@ function analysis(purlin_line)
     purlin_line.free_flange_internal_forces = InternalForceData(Pf, Mxx, Myy, Vxx, Vyy, T, B)
 
     #Calculate demand-to-capacity ratios for each of the purlin line limit states.
-    DC_flexure_torsion, purlin_line.flexure_torsion_DC_data, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all = calculate_flexure_torsion_DC(purlin_line)
-    DC_distortional, eMnd_xx_all = calculate_distortional_buckling_DC(purlin_line)
-    DC_flexure_shear, eMnℓ_xx_all, eVn_all = calculate_flexure_shear_DC(purlin_line)        
-    DC_biaxial_bending, purlin_line.biaxial_bending_DC_data, eMnℓ_xx_all, eMnℓ_yy_all = calculate_biaxial_bending_DC(purlin_line)
-    DC_web_crippling = calculate_web_crippling_DC(purlin_line)
+    purlin_line.flexure_torsion_demand_to_capacity, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all = calculate_flexure_torsion_demand_to_capacity(purlin_line)
+    purlin_line.distortional_demand_to_capacity, eMnd_xx_all = calculate_distortional_buckling_demand_to_capacity(purlin_line)
+    purlin_line.flexure_shear_demand_to_capacity, eMnℓ_xx_all, eVn_all = calculate_flexure_shear_demand_to_capacity(purlin_line)        
+    purlin_line.biaxial_bending_demand_to_capacity, eMnℓ_xx_all, eMnℓ_yy_all = calculate_biaxial_bending_demand_to_capacity(purlin_line)
+    purlin_line.web_crippling_demand_to_capacity = calculate_web_crippling_demand_to_capacity(purlin_line)
 
-    #Add demand-to-capacity ratios to data structure.
-    purlin_line.demand_to_capacity = DemandToCapacity(DC_flexure_torsion, DC_distortional, DC_flexure_shear, DC_biaxial_bending, DC_web_crippling)
-
-
+    #Add expected strengths along purlin line to data structure.
+    purlin_line.expected_strengths = ExpectedStrengths(eMnℓ_xx_all, eMnℓ_yy_all, eMnℓ_yy_free_flange_all, eMnd_xx_all, eVn_all, eBn_all)
 
     return purlin_line
 
 end
 
-function find_max_DC(purlin_line)
+function find_max_demand_to_capacity(purlin_line)
 
-    max_DC_flexure_torsion = maximum(purlin_line.demand_to_capacity.DC_flexure_torsion)
-    max_DC_distortional = maximum(purlin_line.demand_to_capacity.DC_distortional)
-    max_DC_flexure_shear = maximum(purlin_line.demand_to_capacity.DC_flexure_shear)
-    max_DC_biaxial_bending = maximum(purlin_line.demand_to_capacity.DC_biaxial_bending)
-    max_DC_web_crippling = maximum(purlin_line.demand_to_capacity.DC_web_crippling)
+    max_demand_to_capacity_flexure_torsion = maximum(purlin_line.flexure_torsion_demand_to_capacity.demand_to_capacity)
+    max_demand_to_capacity_distortional = maximum(purlin_line.distortional_demand_to_capacity)
+    max_demand_to_capacity_flexure_shear = maximum(purlin_line.flexure_shear_demand_to_capacity)
+    max_demand_to_capacity_biaxial_bending = maximum(purlin_line.biaxial_bending_demand_to_capacity.demand_to_capacity)
+    max_demand_to_capacity_web_crippling = maximum(purlin_line.web_crippling_demand_to_capacity)
 
-    max_DC = maximum([max_DC_flexure_torsion; max_DC_distortional; max_DC_flexure_shear; max_DC_biaxial_bending; max_DC_web_crippling])
+    max_demand_to_capacity = maximum([max_demand_to_capacity_flexure_torsion; max_demand_to_capacity_distortional; max_demand_to_capacity_flexure_shear; max_demand_to_capacity_biaxial_bending; max_demand_to_capacity_web_crippling])
 
-    return max_DC
+    return max_demand_to_capacity
 
 end
 
@@ -2024,24 +2039,25 @@ function identify_failure_limit_state(purlin_line)
 
     max_DC_location_index = Array{Int64}(undef, 5)
 
-    max_DC_flexure_torsion = maximum(purlin_line.demand_to_capacity.DC_flexure_torsion)
-    max_DC_location_index[1] = findfirst(x->x≈max_DC_flexure_torsion, purlin_line.demand_to_capacity.DC_flexure_torsion) 
+    max_DC_flexure_torsion = maximum(purlin_line.flexure_torsion_demand_to_capacity.demand_to_capacity)
+    max_DC_location_index[1] = findfirst(x->x≈max_DC_flexure_torsion, purlin_line.flexure_torsion_demand_to_capacity.demand_to_capacity) 
 
-    max_DC_distortional = maximum(purlin_line.demand_to_capacity.DC_distortional)
-    max_DC_location_index[2] = findfirst(x->x≈max_DC_distortional, purlin_line.demand_to_capacity.DC_distortional) 
+    max_DC_distortional = maximum(purlin_line.distortional_demand_to_capacity)
+    max_DC_location_index[2] = findfirst(x->x≈max_DC_distortional, purlin_line.distortional_demand_to_capacity) 
 
-    max_DC_flexure_shear = maximum(purlin_line.demand_to_capacity.DC_flexure_shear)
-    max_DC_location_index[3] = findfirst(x->x≈max_DC_flexure_shear, purlin_line.demand_to_capacity.DC_flexure_shear) 
+    max_DC_flexure_shear = maximum(purlin_line.flexure_shear_demand_to_capacity)
+    max_DC_location_index[3] = findfirst(x->x≈max_DC_flexure_shear, purlin_line.flexure_shear_demand_to_capacity) 
 
-    max_DC_biaxial_bending = maximum(purlin_line.demand_to_capacity.DC_biaxial_bending)
-    max_DC_location_index[4] = findfirst(x->x≈max_DC_biaxial_bending, purlin_line.demand_to_capacity.DC_biaxial_bending) 
+    max_DC_biaxial_bending = maximum(purlin_line.biaxial_bending_demand_to_capacity.demand_to_capacity)
+    max_DC_location_index[4] = findfirst(x->x≈max_DC_biaxial_bending, purlin_line.biaxial_bending_demand_to_capacity.demand_to_capacity) 
 
-    max_DC_web_crippling = maximum(purlin_line.demand_to_capacity.DC_web_crippling)
-    max_DC_location_index[5] = findfirst(x->x≈max_DC_web_crippling, purlin_line.demand_to_capacity.DC_web_crippling) 
+    max_DC_web_crippling = maximum(purlin_line.web_crippling_demand_to_capacity)
+    max_DC_location_index[5] = findfirst(x->x≈max_DC_web_crippling, purlin_line.web_crippling_demand_to_capacity) 
 
-    max_DC = maximum([max_DC_flexure_torsion; max_DC_distortional; max_DC_flexure_shear; max_DC_biaxial_bending; max_DC_web_crippling])
+    max_DC_list = [max_DC_flexure_torsion; max_DC_distortional; max_DC_flexure_shear; max_DC_biaxial_bending; max_DC_web_crippling]
+    max_DC = maximum(max_DC_list)
 
-    controlling_limit_state_index = findfirst(x->x≈max_DC, max_DC)
+    controlling_limit_state_index = findfirst(x->x≈max_DC, max_DC_list)
 
     if controlling_limit_state_index == 1
 
@@ -2104,7 +2120,7 @@ function test(purlin_line)
     #Run a very small pressure to get the test going.
     purlin_line.applied_pressure = load_sign * 10^-6
     purlin_line = PurlinLine.analysis(purlin_line)
-    max_DC = find_max_DC(purlin_line)
+    max_DC = find_max_demand_to_capacity(purlin_line)
 
     #Define initial residual.
     residual = 1.0 - abs(max_DC)
@@ -2115,7 +2131,7 @@ function test(purlin_line)
         purlin_line.applied_pressure = purlin_line.applied_pressure + (new_pressure - purlin_line.applied_pressure) / 2
 
         purlin_line = PurlinLine.analysis(purlin_line)
-        max_DC = find_max_DC(purlin_line)
+        max_DC = find_max_demand_to_capacity(purlin_line)
 
         residual = 1.0 - abs(max_DC)
 
