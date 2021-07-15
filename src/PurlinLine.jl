@@ -1969,26 +1969,8 @@ function analysis(purlin_line)
     Pf = calculate_free_flange_axial_force(Mxx, member_definitions, purlin_line)
 
     #Apply the shear flow based on the y-direction load along the purlin line free flange model.
-
-    #For a Z section, assume qxf = T/h where h is the purlin height.
-    #Define out-to-out purlin web depth.
-
-    num_purlin_sections = size(purlin_line.inputs.cross_section_dimensions)[1]
-
-    h_section = Array{Float64}(undef, num_purlin_sections)
-
-    for i = 1:num_purlin_sections
-
-        h_section[i] = purlin_line.inputs.cross_section_dimensions[i][5]
-
-    end
-
-    dz = diff(z)
-    h = Mesh.create_line_element_property_array(member_definitions, m, dz, h_section, 3, 1)
-
-    # qxf = qy .* kH
-    #Convert torsion T along member to distributed torque, then divide by the purlin height to approximate force in free flange.
-    qxf = -T ./ [dz[1]/2; dz[1:end-1]/2 .+ dz[2:end]/2; dz[end]/2] ./ h 
+    qxf = qy .* kH
+    
 
     #The y-direction load is assumed to be zero in the free flange model.
     num_nodes = length(z)
@@ -2061,7 +2043,7 @@ function identify_failure_limit_state(purlin_line)
 
     if controlling_limit_state_index == 1
 
-        controlling_limit_state = "flexure + torsion"
+        controlling_limit_state = "the kitchen sink"
 
     elseif controlling_limit_state_index == 2
 
