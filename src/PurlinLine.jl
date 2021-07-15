@@ -5,7 +5,7 @@ using StructuresKit
 
 using NumericalIntegration
 
-export define, analysis, test
+export build, analyze, test
 
 
 struct Inputs
@@ -1400,7 +1400,7 @@ end
 Returns a PurlinLine model built from user inputs.
 """
 
-function define(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+function build(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
 
     #Create the data structure.
     purlin_line = PurlinLineObject()
@@ -1942,7 +1942,7 @@ end
 Returns the PurlinLine structural response to an applied pressure.
 """
 
-function analysis(purlin_line)
+function analyze(purlin_line)
 
     #Translate purlin_line design variables to ThinWalledBeam design variables.
     z, m, member_definitions, section_properties, material_properties, kx, kϕ, ay_kx, qx, qy, ax, ay, end_boundary_conditions, supports = PurlinLine.thin_walled_beam_interface(purlin_line)
@@ -2101,7 +2101,7 @@ function test(purlin_line)
 
     #Run a very small pressure to get the test going.
     purlin_line.applied_pressure = load_sign * 10^-6
-    purlin_line = PurlinLine.analysis(purlin_line)
+    purlin_line = PurlinLine.analyze(purlin_line)
     max_DC = find_max_demand_to_capacity(purlin_line)
 
     #Define initial residual.
@@ -2112,7 +2112,7 @@ function test(purlin_line)
         new_pressure = purlin_line.applied_pressure / max_DC
         purlin_line.applied_pressure = purlin_line.applied_pressure + (new_pressure - purlin_line.applied_pressure) / 2
 
-        purlin_line = PurlinLine.analysis(purlin_line)
+        purlin_line = PurlinLine.analyze(purlin_line)
         max_DC = find_max_demand_to_capacity(purlin_line)
 
         residual = 1.0 - abs(max_DC)
