@@ -43,7 +43,7 @@ purlin_line = PurlinLine.define(design_code, segments, spacing, roof_slope, cros
 purlin_line.loading_direction = "uplift"
 
 #Perform a test to collapse.
-purlin_line = PurlinLine.capacity(purlin_line)
+purlin_line = PurlinLine.strength(purlin_line)
 
 
 
