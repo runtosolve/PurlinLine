@@ -20,7 +20,9 @@ struct Inputs
     deck_material_properties::NTuple{4, Float64}
     frame_flange_width::Float64
     support_locations::Vector{Float64}
+    purlin_frame_connections::String
     bridging_locations::Vector{Float64}
+  
 
 end
 
@@ -288,9 +290,42 @@ function define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, �
         index = floor(Int, length(xcoords_center)/2)
         xcoords_center = xcoords_center .- xcoords_center[index]
 
-    end
+    elseif cross_section_type == "C"
 
-    #Add C section here at some point.
+        r1 = r1 - t #outside to inside
+        r2 = r1 - t
+        r3 = r1 - t
+        r4 = r1 - t
+        nh = n[3]
+        nb1 = n[2]
+        nb2 = n[4]
+        nd1 = n[1]
+        nd2 = n[5]
+        nr1 = n_radius[1]
+        nr2 = n_radius[2]
+        nr3 = n_radius[3]
+        nr4 = n_radius[4]
+
+        kipin = 1
+        CorZ = 1
+        center = 2  #out to out
+
+        q1 = 90.0
+        q2 = 90.0
+
+        prop,node,elem,lengths,springs,constraints,geom,cz = StructuresKit.CUFSM.templatecalc(CorZ,h,b1,b2,d1,d2,r1,r2,r3,r4,q1,q2,t,nh,nb1,nb2,nd1,nd2,nr1,nr2,nr3,nr4,kipin,center)
+
+        xcoords_center = node[:, 2]
+        ycoords_center = node[:, 3]
+
+        #Shift y coordinates so that the bottom purlin face is at y = 0.
+        ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
+
+        #Shift x coordinates so that the purlin web centerline is at x = 0.
+        index = floor(Int, length(xcoords_center)/2)
+        xcoords_center = xcoords_center .- xcoords_center[index]
+
+    end
 
     #Package nodal geometry.
     node_geometry = [xcoords_center ycoords_center]
@@ -342,9 +377,42 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d1, b1, 
         index = length(xcoords_center)
         xcoords_center = xcoords_center .- xcoords_center[index]
 
-    end
+    elseif cross_section_type == "C"
 
-    #Add C section here at some point.
+        #Define the top C purlin surface.   For the top flange, this means the out-to-out dimensions.  For the bottom flange, the interior outside dimensions should be used.
+
+        #First calculate the correction on out-to-out length to go from the outside surface to the inside bottom flange surface.
+        delta_lip_bottom = t / tan((π - deg2rad(abs(α2 - α1))) / 2)
+        delta_web_bottom = t / tan((π - deg2rad(abs(α3 - α2))) / 2)
+
+        #Note here that the bottom flange and lip dimensions are smaller here.
+        #Use 1/5 of the web height.
+        ΔL = [d1 - delta_lip_bottom, b1 - delta_lip_bottom - delta_web_bottom, h/5 - delta_web_bottom]
+        θ = [α1, α2, α3]
+
+        #The inside radius is used for the bottom flange.
+        radius = [r1 - t, r2 - t]
+
+        closed_or_open = 1
+
+        purlin = CrossSection.Feature(ΔL, θ, n, radius, n_radius, closed_or_open)
+
+        #Calculate the out-to-out purlin surface coordinates.
+        xcoords_out, ycoords_out = CrossSection.get_xy_coordinates(purlin)
+
+        #Calculate centerline purlin coordinates.
+        unitnormals = CrossSection.surface_normals(xcoords_out, ycoords_out, closed_or_open)
+        nodenormals = CrossSection.avg_node_normals(unitnormals, closed_or_open)
+        xcoords_center, ycoords_center = CrossSection.xycoords_along_normal(xcoords_out, ycoords_out, nodenormals, -t/2)
+
+        #Shift y coordinates so that the bottom purlin face is at y = 0.
+        ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
+
+        #Shift x coordinates so that the purlin web centerline is at x = 0.
+        index = length(xcoords_center)
+        xcoords_center = xcoords_center .- xcoords_center[index]
+
+    end
 
     #Package nodal geometry.
     node_geometry = [xcoords_center ycoords_center]
@@ -1303,7 +1371,7 @@ function calculate_web_crippling_strength(purlin_line)
     for i = 1:num_supports
 
         #Find purlin segment that coincides with a support.
-        purlin_range_indices = findall(x->x <= purlin_line.inputs.support_locations[i], purlin_range)
+        purlin_range_indices = findall(x->(x < purlin_line.inputs.support_locations[i]) | (x ≈ purlin_line.inputs.support_locations[i]) , purlin_range)
         if purlin_range_indices == [1]
             segment_index = 1
         else
@@ -1311,7 +1379,7 @@ function calculate_web_crippling_strength(purlin_line)
         end 
 
         #Define if support is at the end or in the interior of a purlin line.
-        if (purlin_line.inputs.support_locations[i] == purlin_range[1]) | (purlin_line.inputs.support_locations[i] == purlin_range[end])
+        if (purlin_line.inputs.support_locations[i] ≈ purlin_range[1]) | (purlin_line.inputs.support_locations[i] ≈ purlin_range[end])
             load_location = "End"
         else
             load_location = "Interior"
@@ -1338,6 +1406,30 @@ function calculate_web_crippling_strength(purlin_line)
            
 
             web_crippling_coeff = filter(row -> row.support_condition == "Fastened to Support", table_g53)
+            web_crippling_coeff = filter(row -> row.flange_condition == "Stiffened or Partially Stiffened Flanges", web_crippling_coeff)
+            web_crippling_coeff = filter(row -> row.load_case == "One-Flange Loading or Reaction", web_crippling_coeff)
+            web_crippling_coeff = filter(row -> row.load_location== load_location, web_crippling_coeff)
+
+            C = web_crippling_coeff.C[1]
+            C_R = web_crippling_coeff.C_R[1]
+            R = purlin_line.inputs.cross_section_dimensions[section_index][14] - t  #inside radius
+            C_N = web_crippling_coeff.C_N[1]
+            N = purlin_line.inputs.frame_flange_width
+            C_h = web_crippling_coeff.C_h[1]
+            ϕ_w = web_crippling_coeff.LRFD[1]
+            Ω_w = web_crippling_coeff.ASD[1]
+
+            Pn, ePn = AISIS10016.g51(t, h_flat, Fy, θ, C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ASDorLRFD)
+
+            web_crippling[i] = WebCripplingData(web_crippling_coeff.support_condition[1], web_crippling_coeff.flange_condition[1], web_crippling_coeff.load_case[1], web_crippling_coeff.load_location[1], C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, Pn, ePn)
+
+        elseif purlin_line.inputs.cross_section_dimensions[section_index][1] == "C"
+
+            #Use AISI S100-16 Table G5-2 for C-sections.
+            table_g52 = StructuresKit.AISIS10016.table_g52()  
+           
+
+            web_crippling_coeff = filter(row -> row.support_condition == "Fastened to Support", table_g52)
             web_crippling_coeff = filter(row -> row.flange_condition == "Stiffened or Partially Stiffened Flanges", web_crippling_coeff)
             web_crippling_coeff = filter(row -> row.load_case == "One-Flange Loading or Reaction", web_crippling_coeff)
             web_crippling_coeff = filter(row -> row.load_location== load_location, web_crippling_coeff)
@@ -1400,13 +1492,13 @@ end
 Returns a PurlinLine model built from user inputs.
 """
 
-function build(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+function build(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
 
     #Create the data structure.
     purlin_line = PurlinLineObject()
 
     #Capture inputs.
-    purlin_line.inputs = PurlinLine.Inputs(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, bridging_locations)
+    purlin_line.inputs = PurlinLine.Inputs(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
 
     #CALCULATIONS LAYER
 
@@ -1734,6 +1826,15 @@ function calculate_flexural_capacity_envelope(m, eMn_pos, eMn_neg, M)
     eMn_pos_all = [eMn_pos[m[i]] for i=1:num_nodes]
     eMn_neg_all = [eMn_neg[m[i]] for i=1:num_nodes]
 
+    #Make sure the smaller capacity is taken at a discontinuity, like at the end of a splice.
+    diff_m = diff(m)
+    jumps = findall(x-> x > 0.0, diff_m)
+    for i = 1:length(jumps)
+        eMn_pos_all[jumps[i]] = minimum([eMn_pos_all[jumps[i]], eMn_pos_all[jumps[i]+1]])
+        eMn_neg_all[jumps[i]] = minimum([eMn_neg_all[jumps[i]], eMn_neg_all[jumps[i]+1]])
+    end
+
+
     eMn_all = zeros(Float64, num_nodes)
 
     for i in eachindex(M)
@@ -1776,7 +1877,17 @@ function calculate_flexure_torsion_demand_to_capacity(purlin_line)
     eMnℓ_yy_free_flange_all = zeros(Float64, num_nodes)
     eMnℓ_yy_free_flange_all .= eMnℓ_yy_free_flange_range[purlin_line.model.m]
 
-    results = AISIS10024.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, purlin_line.free_flange_internal_forces.Myy, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
+    #Assume free flange bending interaction with strong axis flexure is in play only when there is negative moment.
+    num_nodes = length(purlin_line.model.z)
+    free_flange_moment = zeros(Float64, num_nodes)
+    for i = 1:num_nodes
+        if purlin_line.internal_forces.Mxx[i] < 0.0
+            free_flange_moment[i] = purlin_line.free_flange_internal_forces.Myy[i]
+        end
+    end
+
+
+    results = AISIS10024.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, free_flange_moment, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
 
     action_Mx = [x[1] for x in results]
     action_My = [x[2] for x in results]
@@ -1862,28 +1973,28 @@ function calculate_biaxial_bending_demand_to_capacity(purlin_line)
 
 end
 
-function calculate_support_reactions(purlin_line)
+function calculate_support_reactions(support_locations, z, Vyy)
 
-    num_supports = length(purlin_line.inputs.support_locations)
-    num_nodes = length(purlin_line.model.z)
+    num_supports = length(support_locations)
+    num_nodes = length(z)
 
     Fyy = zeros(Float64, num_supports)
 
     for i = 1:num_supports
 
-        support_index = findfirst(x->x≈purlin_line.inputs.support_locations[i], purlin_line.model.z)
+        support_index = findfirst(x->x≈support_locations[i], z)
 
         if support_index == 1  #z=0
 
-            Fyy[i] = purlin_line.internal_forces.Vyy[support_index]
+            Fyy[i] = Vyy[support_index]
             
         elseif support_index == num_nodes  #z=end
 
-            Fyy[i] = -purlin_line.internal_forces.Vyy[support_index]
+            Fyy[i] = -Vyy[support_index]
 
         else  #interior supports
 
-            Fyy[i] = -purlin_line.internal_forces.Vyy[support_index - 1] + purlin_line.internal_forces.Vyy[support_index]
+            Fyy[i] = -Vyy[support_index - 1] + Vyy[support_index]
 
         end
 
@@ -1899,7 +2010,7 @@ function calculate_web_crippling_demand_to_capacity(purlin_line)
 
     num_supports = length(purlin_line.inputs.support_locations)
 
-    Fyy = calculate_support_reactions(purlin_line)
+    Fyy = calculate_support_reactions(purlin_line.inputs.support_locations, purlin_line.model.z, purlin_line.internal_forces.Vyy)
 
     purlin_line.support_reactions = Reactions(Fyy)
 
@@ -1910,6 +2021,10 @@ function calculate_web_crippling_demand_to_capacity(purlin_line)
         if purlin_line.support_reactions.Fyy[i] <= 0.0
 
             DC[i] = 0.0   #uplift, no web crippling
+
+        elseif purlin_line.inputs.purlin_frame_connections == "anti-roll clip"
+
+            DC[i] = 0.0   #Assume anti-roll clip braces purlin web over flange
 
         else
 
@@ -1970,7 +2085,6 @@ function analyze(purlin_line)
 
     #Apply the shear flow based on the y-direction load along the purlin line free flange model.
     qxf = qy .* kH
-    
 
     #The y-direction load is assumed to be zero in the free flange model.
     num_nodes = length(z)
@@ -2043,7 +2157,7 @@ function identify_failure_limit_state(purlin_line)
 
     if controlling_limit_state_index == 1
 
-        controlling_limit_state = "the kitchen sink"
+        controlling_limit_state = "strong axis flexure + weak axis flexure + lateral free flange deformation + torsion"
 
     elseif controlling_limit_state_index == 2
 
