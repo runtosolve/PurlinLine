@@ -662,6 +662,85 @@ function define_deck_bracing_properties(purlin_line)
 
         end
 
+    elseif purlin_line.inputs.deck_details[1] == "vertical leg standing seam"
+
+        #Define the standing seam roof clip spacing.
+        standing_seam_clip_spacing = purlin_line.inputs.deck_details[2]
+
+        #Define the distance between fasteners as the distortional discrete bracing length.
+         Lm = standing_seam_clip_spacing
+
+         #Loop over all the purlin segments in the line.
+        for i = 1:num_purlin_segments
+
+            #Define the section property index associated with purlin segment i.
+            section_index = purlin_line.inputs.segments[i][2]
+
+            #Define the material property index associated with purlin segment i.
+            material_index = purlin_line.inputs.segments[i][3]
+
+            #Define purlin steel Poisson's ratio.
+            μ_purlin = purlin_line.inputs.material_properties[material_index][2]
+
+            #Define the purlin top flange width.
+            b_top = purlin_line.inputs.cross_section_dimensions[section_index][6]
+
+            #Define purlin base metal thickness.
+            t_purlin = purlin_line.inputs.cross_section_dimensions[section_index][2]
+
+            #Define out-to-out purlin web depth.
+            ho = purlin_line.inputs.cross_section_dimensions[section_index][5]
+
+            #Define purlin top flange lip length.
+            d_top = purlin_line.inputs.cross_section_dimensions[section_index][7]
+
+            #Define purlin top flange lip angle from the horizon, in degrees.
+            θ_top = purlin_line.inputs.cross_section_dimensions[section_index][11] - purlin_line.inputs.cross_section_dimensions[section_index][12]
+
+            #For a standing seam roof, kp = 0.0.
+            kp = 0.0
+
+            #Apply Cee or Zee binary.
+            if purlin_line.inputs.cross_section_dimensions[section_index][1] == "Z"
+                CorZ = 1
+            elseif purlin_line.inputs.cross_section_dimensions[section_index][1] == "C"
+                CorZ = 0
+            end
+
+            #Define the rotational stiffness provided to the purlin by the standing seam roof.  It is assumed that the deck flexural stiffness is much higher than the connection stiffness.
+
+            #Use rotational stiffness values from Seek et al. (2021) https://www.sciencedirect.com/science/article/pii/S0143974X21000717?via%3Dihub, the V-HF-4 and V-HF-6 tests (vertical leg standing seam, high-fixed, 4 or 6 in. of uncompressed batt insulation)
+
+            kϕ = 0.250   #kip-in./rad/in.
+
+            #Calculate the purlin distortional buckling half-wavelength.
+
+            #Calculate top flange + lip section properties.
+            Af, Jf, Ixf, Iyf, Ixyf, Cwf, xof,  hxf, hyf, yof = AISIS10016.table23131(CorZ, t_purlin, b_top, d_top, θ_top)
+
+            #Calculate the purlin distortional buckling half-wavelength.
+            Lcrd, L = AISIS10016.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
+
+            #If Lcrd is longer than the clip spacing, then the distortional buckling will be restrained by the deck.
+            if Lcrd >= Lm
+                kϕ_dist = kϕ
+            else
+                kϕ_dist = 0.0
+            end
+
+            #Approximate the lateral stiffness provided to the top of the purlin by the standing seam connection between the deck and the purlin.
+
+            #Not much testing available.  Use this conservative value for now.
+
+            kx = 0.002  #From Cronin and Moen (2012), Figure 4.8  kips/in/in, https://vtechworks.lib.vt.edu/bitstream/handle/10919/18711/Flexural%20Capacity%20Prediction%20Method%20for%20an%20Open%20Web%20Joist%20Laterally%20Braced%20by%20a%20Standing%20Seam%20Roof%20System%20R10.pdf?sequence=1&isAllowed=y
+        
+
+            #Collect all the outputs.
+            bracing_data[i] = BracingData(kp, kϕ, kϕ_dist, kx, Lcrd, Lm)
+
+        end
+
+
     end
 
     return bracing_data
@@ -1615,9 +1694,36 @@ function thin_walled_beam_interface(purlin_line)
     ay_kx = Array{Array{Float64}}(undef, 1)
     ay_kx[1] = Mesh.create_line_element_property_array(member_definitions, m, dz, spring_location_segment, 3, 1)
 
-    #Define purlin line support locations for ThinWalledBeam.
-    #location where u=v=ϕ=0
-    supports = purlin_line.inputs.support_locations
+    #Define purlin line support locations for ThinWalledBeam.  
+    
+    #If there are anti-roll clips assume purlin is fixed in rotation at a frame support. If the purlins are connected to the frame just at the purlin bottom flange, assumed the purlin is free to rotate at the support.
+
+    #For intermediate bridging, assume lateral displacement and twist are fully restrained.
+    
+    supports_and_bridging = sort(unique([purlin_line.inputs.support_locations; purlin_line.inputs.bridging_locations]))
+
+    num_supports = length(supports_and_bridging)
+
+    supports = Vector{Tuple{Float64, String, String, String}}(undef, num_supports)
+
+    for i = 1:num_supports
+
+        if (purlin_line.inputs.purlin_frame_connections == "anti-roll clip") & (supports_and_bridging[i] in purlin_line.inputs.support_locations)
+            
+            supports[i] = (supports_and_bridging[i], "fixed", "fixed", "fixed")
+        
+        elseif (purlin_line.inputs.purlin_frame_connections == "bottom flange connection") & (supports_and_bridging[i] in purlin_line.inputs.support_locations)
+
+            supports[i] = (supports_and_bridging[i], "fixed", "fixed", "free")
+
+        elseif supports_and_bridging[i] in purlin_line.inputs.bridging_locations  #intermediate bridging
+
+            supports[i] = (supports_and_bridging[i], "fixed", "free", "fixed")   #lateral fixed, vertical free, rotation fixed
+
+        end
+
+    end
+
 
     #Define purlin line end boundary conditions for ThinWalledBeam.
 
@@ -1628,14 +1734,14 @@ function thin_walled_beam_interface(purlin_line)
     #type=1 u''=v''=ϕ''=0 (simply supported), type=2 u'=v'=ϕ'=0  (fixed), type=3 u''=v''=ϕ''=u'''=v'''=ϕ'''=0 (free end, e.g., a cantilever)
 
     #z=0 (left) end
-    if supports[1] == 0.0
+    if supports[1][1] == 0.0
         end_boundary_conditions[1] = 1 #pin
     else
         end_boundary_conditions[1] = 3  #cantilever
     end
 
     #z=purlin_line_length (right) end
-    if supports[end] == purlin_line_length
+    if supports[end][1] == purlin_line_length
         end_boundary_conditions[2] = 1
     else
         end_boundary_conditions[2] = 3  #cantilever
@@ -1830,8 +1936,10 @@ function calculate_flexural_capacity_envelope(m, eMn_pos, eMn_neg, M)
     diff_m = diff(m)
     jumps = findall(x-> x > 0.0, diff_m)
     for i = 1:length(jumps)
-        eMn_pos_all[jumps[i]] = minimum([eMn_pos_all[jumps[i]], eMn_pos_all[jumps[i]+1]])
-        eMn_neg_all[jumps[i]] = minimum([eMn_neg_all[jumps[i]], eMn_neg_all[jumps[i]+1]])
+        eMn_pos_all[jumps[i]] = minimum([eMn_pos_all[jumps[i]], eMn_pos_all[jumps[i]+1], eMn_pos_all[jumps[i]-1]])
+        eMn_pos_all[jumps[i]+1] = minimum([eMn_pos_all[jumps[i]], eMn_pos_all[jumps[i]+1], eMn_pos_all[jumps[i]-1]])
+        eMn_neg_all[jumps[i]] = minimum([eMn_neg_all[jumps[i]], eMn_neg_all[jumps[i]+1], eMn_neg_all[jumps[i]-1]])
+        eMn_neg_all[jumps[i]+1] = minimum([eMn_neg_all[jumps[i]], eMn_neg_all[jumps[i]+1], eMn_neg_all[jumps[i]-1]])
     end
 
 
@@ -2006,29 +2114,25 @@ function calculate_support_reactions(support_locations, z, Vyy)
 end
 
 
-function calculate_web_crippling_demand_to_capacity(purlin_line)
+function calculate_web_crippling_demand_to_capacity(support_locations, z, Vyy, Fyy, purlin_frame_connections, ePn)
 
-    num_supports = length(purlin_line.inputs.support_locations)
-
-    Fyy = calculate_support_reactions(purlin_line.inputs.support_locations, purlin_line.model.z, purlin_line.internal_forces.Vyy)
-
-    purlin_line.support_reactions = Reactions(Fyy)
+    num_supports = length(support_locations)
 
     DC = zeros(Float64, num_supports)
 
     for i = 1:num_supports
 
-        if purlin_line.support_reactions.Fyy[i] <= 0.0
+        if Fyy[i] <= 0.0
 
             DC[i] = 0.0   #uplift, no web crippling
 
-        elseif purlin_line.inputs.purlin_frame_connections == "anti-roll clip"
+        elseif purlin_frame_connections == "anti-roll clip"
 
             DC[i] = 0.0   #Assume anti-roll clip braces purlin web over flange
 
         else
 
-            DC[i] = purlin_line.support_reactions.Fyy[i]/purlin_line.web_crippling[i].ePn
+            DC[i] = Fyy[i]/ePn[i]
 
         end
 
@@ -2102,12 +2206,22 @@ function analyze(purlin_line)
     #Add free flange internal forces to data structure.
     purlin_line.free_flange_internal_forces = InternalForceData(Pf, Mxx, Myy, Vxx, Vyy, T, B)
 
+    #Add support reactions to data structure.
+    Fyy = calculate_support_reactions(purlin_line.inputs.support_locations, purlin_line.model.z, purlin_line.internal_forces.Vyy)
+    purlin_line.support_reactions = Reactions(Fyy)
+
     #Calculate demand-to-capacity ratios for each of the purlin line limit states.
     purlin_line.flexure_torsion_demand_to_capacity, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all = calculate_flexure_torsion_demand_to_capacity(purlin_line)
     purlin_line.distortional_demand_to_capacity, eMnd_xx_all = calculate_distortional_buckling_demand_to_capacity(purlin_line)
     purlin_line.flexure_shear_demand_to_capacity, eMnℓ_xx_all, eVn_all = calculate_flexure_shear_demand_to_capacity(purlin_line)        
     purlin_line.biaxial_bending_demand_to_capacity, eMnℓ_xx_all, eMnℓ_yy_all = calculate_biaxial_bending_demand_to_capacity(purlin_line)
-    purlin_line.web_crippling_demand_to_capacity = calculate_web_crippling_demand_to_capacity(purlin_line)
+    
+    
+    ePn = [purlin_line.web_crippling[i].ePn for i = 1:length(purlin_line.web_crippling)]
+    purlin_line.web_crippling_demand_to_capacity = 
+    calculate_web_crippling_demand_to_capacity(purlin_line.inputs.support_locations, purlin_line.model.z, purlin_line.internal_forces.Vyy, Fyy, purlin_line.inputs.purlin_frame_connections, ePn)
+
+
 
     #Add expected strengths along purlin line to data structure.
     purlin_line.expected_strengths = ExpectedStrengths(eMnℓ_xx_all, eMnℓ_yy_all, eMnℓ_yy_free_flange_all, eMnd_xx_all, eVn_all, eBn_all)
