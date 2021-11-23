@@ -546,8 +546,22 @@ function deck_pull_through_fastener_stiffness(deck_material_properties, b_top, t
         #Convert kp from N/mm to kips/in.
         kp = kp / 1000 / 4.448 * 25.4
 
+    elseif deck_material_properties[1] == 29500000.0
+
+        #Define the fastener distance from the purlin pivot point.  The purlin pivot point for a Z section is the top flange - web intersection. Assume the fastener location is centered in the purlin top flange.
+        c = b_top * 25.4 / 2 #mm
+
+        #Define the roof deck thickness in metric.
+        tw = t_roof_deck * 25.4  #mm
+
+        #Approximate the roof panel base metal thickness.
+        kp = Connections.cfs_pull_through_plate_stiffness(x, c, tw)
+
+        #Convert kp from N/mm to lbs/in.
+        kp = kp / 1000 / 4.448 * 25.4 * 1000
+
     else
-        error("Set the deck elastic modulus to 29500.0 ksi or 203225.0 MPa.")
+        error("Set the deck elastic modulus to 29500.0 ksi or 29500000.0 psi or 203225.0 MPa.")
 
     end
 
@@ -1273,6 +1287,7 @@ function calculate_distortional_flexural_strength(purlin_line)
 
         #Define the material property index associated with purlin segment i.
         material_index = purlin_line.inputs.segments[i][3]
+        section_index = purlin_line.inputs.segments[i][2]
 
         My = purlin_line.yielding_flexural_strength_xx[i].My
         Mcrd_xx_pos = purlin_line.distortional_buckling_xx_pos[i].Mcr
