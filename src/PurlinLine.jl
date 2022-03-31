@@ -138,6 +138,7 @@ struct WebCripplingData
 
 end
 
+
 struct FlexureTorsion_DemandToCapacity_Data
     
     action_Mxx::Array{Float64}
@@ -319,7 +320,7 @@ function define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, �
         q1 = 90.0
         q2 = 90.0
 
-        prop,node,elem,lengths,springs,constraints,geom,cz = StructuresKit.CUFSM.templatecalc(CorZ,h,b1,b2,d1,d2,r1,r2,r3,r4,q1,q2,t,nh,nb1,nb2,nd1,nd2,nr1,nr2,nr3,nr4,kipin,center)
+        prop,node,elem,lengths,springs,constraints,geom,cz = CUFSM.templatecalc(CorZ,h,b1,b2,d1,d2,r1,r2,r3,r4,q1,q2,t,nh,nb1,nb2,nd1,nd2,nr1,nr2,nr3,nr4,kipin,center)
 
         xcoords_center = node[:, 2]
         ycoords_center = node[:, 3]
@@ -1548,7 +1549,7 @@ function calculate_web_crippling_strength(purlin_line)
 
             Pn, ePn = AISIS10016.g51(t, h_flat, Fy, θ, C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, purlin_line.inputs.design_code)
 
-            web_crippling[i] = WebCripplingData(web_crippling_coeff.support_condition[1], web_crippling_coeff.flange_condition[1], web_crippling_coeff.load_case[1], web_crippling_coeff.load_location[1], C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w, ϕ_w_LSD, Pn, ePn)
+            web_crippling[i] = WebCripplingData(web_crippling_coeff.support_condition[1], web_crippling_coeff.flange_condition[1], web_crippling_coeff.load_case[1], web_crippling_coeff.load_location[1], C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, Pn, ePn)
 
         end
 
