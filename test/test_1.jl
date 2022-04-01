@@ -1,14 +1,14 @@
 using PurlinLine
-using StructuresKit
+# using StructuresKit
 
 design_code = "AISI S100-16 ASD"
 
 # Define the properties of each purlin segment along the line.
                 #length, section_properties, material_properties
-segments = [(23.0*12, 1, 1),
-                (2.0*12, 2, 1),
-                (2.0*12, 2, 1),
-                (23.0*12, 1, 1)]
+segments = [(23.0*12, 23.0, 1, 1),
+                (2.0*12, 2.0, 2, 1),
+                (2.0*12, 2.0, 2, 1),
+                (23.0*12, 2.0, 1, 1)]
 
 # Define the purlin spacing.
 spacing = 60;  #in.
