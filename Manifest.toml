@@ -20,9 +20,9 @@ version = "0.2.0"
 
 [[deps.ArrayInterface]]
 deps = ["Compat", "IfElse", "LinearAlgebra", "Requires", "SparseArrays", "Static"]
-git-tree-sha1 = "6e8fada11bb015ecf9263f64b156f98b546918c7"
+git-tree-sha1 = "8d4a07999261b4461daae67b2d1e12ae1a097741"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "5.0.5"
+version = "5.0.6"
 
 [[deps.ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra", "SparseArrays"]
@@ -644,15 +644,15 @@ version = "0.1.6"
 
 [[deps.LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "MatrixFactorizations", "SparseArrays", "StaticArrays"]
-git-tree-sha1 = "3a26b464576880e43f29c5dc466b89fa9324ed5f"
+git-tree-sha1 = "721bebe4d0f8581c18fccf272c62000e22a80a2d"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "0.22.9"
+version = "0.22.10"
 
 [[deps.LazyBandedMatrices]]
 deps = ["ArrayLayouts", "BandedMatrices", "BlockArrays", "BlockBandedMatrices", "FillArrays", "LazyArrays", "LinearAlgebra", "MatrixFactorizations", "SparseArrays", "StaticArrays"]
-git-tree-sha1 = "f8f4021e3d73c7ba22df756e9e45110dd0071d2d"
+git-tree-sha1 = "b1708e45e6b4308593904a14d0e5b0970d9ed0bb"
 uuid = "d7e5e226-e90b-4449-9968-0f923699bf6f"
-version = "0.7.10"
+version = "0.7.12"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -1204,9 +1204,9 @@ version = "0.9.16"
 
 [[deps.StrideArraysCore]]
 deps = ["ArrayInterface", "CloseOpenIntervals", "IfElse", "LayoutPointers", "ManualMemory", "Requires", "SIMDTypes", "Static", "ThreadingUtilities"]
-git-tree-sha1 = "59b948d4266d80cd30ff3699c5c376adbcfec56a"
+git-tree-sha1 = "6685213e80d3173f23947224a2fa71886def0119"
 uuid = "7792a7ef-975c-4747-a70f-980b88e8d1da"
-version = "0.2.16"
+version = "0.2.17"
 
 [[deps.StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArrays", "Tables"]
