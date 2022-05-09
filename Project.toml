@@ -4,12 +4,17 @@ authors = ["Cris Moen <cris.moen@runtosolve.com>"]
 version = "0.1.0"
 
 [deps]
+CUFSM = "82b4978f-06ae-48e0-88e8-a26b4f7a0fa1"
+Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
+Geometry = "c515e630-5686-4add-9a32-d2a671ea1e20"
+InternalForces = "0ac833a1-d586-4577-9e6b-83a7c69b6692"
 NumericalIntegration = "e7bfaba1-d571-5449-8927-abc22e82249b"
+S100AISI = "01f7396e-a581-4110-84fa-e8964400bef8"
+ScrewConnections = "5bf228db-695e-4268-9ee9-a0e568bd4ab1"
+SectionProperties = "03320fb2-42b0-43fd-9b66-b95dbaa39193"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-StructuresKit = "f6c18a9d-8941-4a0a-88a3-c5fc4dcc4715"
+ThinWalledBeam = "1c93ddf5-a21f-4e01-8bde-98213f7f7d54"
+ThinWalledBeamColumn = "79be238d-76c4-453b-a7f7-71368c01feb5"
 
 [compat]
-NumericalIntegration = "0.2.0"
-StaticArrays = "0.12.5"
-StructuresKit = "v0.1.5"
 julia = "1.6.1"
