@@ -18,6 +18,19 @@ roof_slope = 0.0;   #degrees
 cross_section_dimensions = [("Z", 0.059, 0.91, 2.5, 8.0, 2.5, 0.91, -55.0, 0.0, 90.0, 0.0, -55.0, 3*0.059, 3*0.059, 3*0.059, 3*0.059)]
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+#############
 material_properties = [(29500.0, 0.30, 55.0, 70.0)]
 
 #type="screw-fastened", thickness, fastener spacing, fastener diameter, fastener_shear_strength
