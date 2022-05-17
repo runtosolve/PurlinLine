@@ -289,7 +289,10 @@ function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, 
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, -t/2)
+        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
+
+        xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
+        ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -309,7 +312,10 @@ function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, 
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, t/2)
+        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
+
+        xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
+        ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -356,7 +362,10 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, -t/2)
+        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
+
+        xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
+        ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -377,7 +386,10 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, -t/2)
+        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, -t/2)
+
+        xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
+        ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
