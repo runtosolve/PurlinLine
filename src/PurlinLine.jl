@@ -6,6 +6,7 @@ using Dierckx
 using NumericalIntegration
 using S100AISI
 using SectionProperties
+using CrossSection
 using InternalForces
 using ThinWalledBeam
 using ThinWalledBeamColumn
@@ -41,7 +42,7 @@ Base.@kwdef struct CrossSectionData
     node_geometry::Array{Float64}
     element_definitions::Array{Float64}
     section_properties::CUFSM.SectionPropertiesObject
-    plastic_section_properties::Union{SectionProperties.PlasticSectionProperties, Nothing} = nothing
+    plastic_section_properties::Union{SectionProperties.Lines.PlasticSectionProperties, Nothing} = nothing
 
 end
 
@@ -266,34 +267,29 @@ mutable struct PurlinLineObject
 end
 
 
-function define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n, n_radius)
+function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, h, b_top, d_top, Θ_bottom_lip, Θ_bottom_flange, Θ_web, Θ_top_flange, Θ_top_lip, r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip, n, n_radius)
 
     if cross_section_type == "Z"
 
         #Define the top Z purlin surface.   For the top flange, this means the out-to-out dimensions.  For the bottom flange, the interior outside dimensions should be used.
 
         #First calculate the correction on out-to-out length to go from the outside surface to the inside bottom flange surface.
-        delta_lip_bottom = t / tan((π - deg2rad(abs(α2 - α1))) / 2)
-        delta_web_bottom = t / tan((π - deg2rad(abs(α3 - α2))) / 2)
+        delta_lip_bottom = t / tan((π - deg2rad(abs(Θ_bottom_flange - Θ_bottom_lip))) / 2)
+        delta_web_bottom = t / tan((π - deg2rad(abs(Θ_web - Θ_bottom_flange))) / 2)
 
         #Note here that the bottom flange and lip dimensions are smaller here.
-        ΔL = [d1 - delta_lip_bottom, b1 - delta_lip_bottom - delta_web_bottom, h - delta_web_bottom, b2, d2]
-        θ = [α1, α2, α3, α4, α5]
+        L = [d_bottom - delta_lip_bottom, b_bottom - delta_lip_bottom - delta_web_bottom, h - delta_web_bottom, b_top, d_top]
+        θ = deg2rad.([Θ_bottom_lip, Θ_bottom_flange, Θ_web, Θ_top_flange, Θ_top_lip])
 
         #Note that the outside radius is used at the top flange, and the inside radius is used for the bottom flange.
-        radius = [r1 - t, r2 - t, r3, r4]
+        r = [r_bottom_flange_lip - t, r_bottom_flange_web - t, r_top_flange_web, r_top_flange_lip]
 
-        closed_or_open = 1
-
-        purlin = SectionProperties.Feature(ΔL, θ, n, radius, n_radius, closed_or_open)
-
-        #Calculate the out-to-out purlin surface coordinates.
-        xcoords_out, ycoords_out = SectionProperties.get_xy_coordinates(purlin)
-
-        #Calculate centerline purlin coordinates.
-        unitnormals = SectionProperties.surface_normals(xcoords_out, ycoords_out, closed_or_open)
-        nodenormals = SectionProperties.avg_node_normals(unitnormals, closed_or_open)
-        xcoords_center, ycoords_center = SectionProperties.xycoords_along_normal(xcoords_out, ycoords_out, nodenormals, -t/2)
+        #Get outside coords 
+        coords_out = CrossSection.generate_open(L, θ, r, n, n_radius)
+        #Get node normals on cross-section
+        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        #Get centerline coords
+        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, -t/2)
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -304,31 +300,16 @@ function define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, �
 
     elseif cross_section_type == "C"
 
-        r1 = r1 - t #outside to inside
-        r2 = r1 - t
-        r3 = r1 - t
-        r4 = r1 - t
-        nh = n[3]
-        nb1 = n[2]
-        nb2 = n[4]
-        nd1 = n[1]
-        nd2 = n[5]
-        nr1 = n_radius[1]
-        nr2 = n_radius[2]
-        nr3 = n_radius[3]
-        nr4 = n_radius[4]
-
-        kipin = 1
-        CorZ = 1
-        center = 2  #out to out
-
-        q1 = 90.0
-        q2 = 90.0
-
-        prop,node,elem,lengths,springs,constraints,geom,cz = CUFSM.templatecalc(CorZ,h,b1,b2,d1,d2,r1,r2,r3,r4,q1,q2,t,nh,nb1,nb2,nd1,nd2,nr1,nr2,nr3,nr4,kipin,center)
-
-        xcoords_center = node[:, 2]
-        ycoords_center = node[:, 3]
+        L = [d_bottom, b_bottom, h, b_top, d_top]
+        θ = deg2rad.([Θ_bottom_lip, Θ_bottom_flange, Θ_web, Θ_top_flange, Θ_top_lip])
+        r = [r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip]
+        
+        #Get outside coords 
+        coords_out = CrossSection.generate_open(L, θ, r, n, n_radius)
+        #Get node normals on cross-section
+        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        #Get centerline coords
+        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, t/2)
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -352,35 +333,30 @@ end
 
 
 
-function define_purlin_free_flange_cross_section(cross_section_type, t, d1, b1, h, α1, α2, α3, r1, r2, n, n_radius)
+function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom, b_bottom, h, Θ_bottom_lip, Θ_bottom_flange, Θ_web, r_bottom_flange_lip, r_bottom_flange_web, n, n_radius)
 
     if cross_section_type == "Z"
 
         #Define the top Z purlin surface.   For the top flange, this means the out-to-out dimensions.  For the bottom flange, the interior outside dimensions should be used.
 
         #First calculate the correction on out-to-out length to go from the outside surface to the inside bottom flange surface.
-        delta_lip_bottom = t / tan((π - deg2rad(abs(α2 - α1))) / 2)
-        delta_web_bottom = t / tan((π - deg2rad(abs(α3 - α2))) / 2)
+        delta_lip_bottom = t / tan((π - deg2rad(abs(Θ_bottom_flange - Θ_bottom_lip))) / 2)
+        delta_web_bottom = t / tan((π - deg2rad(abs(Θ_web - Θ_bottom_flange))) / 2)
 
         #Note here that the bottom flange and lip dimensions are smaller here.
         #Use 1/5 of the web height.
-        ΔL = [d1 - delta_lip_bottom, b1 - delta_lip_bottom - delta_web_bottom, h/5 - delta_web_bottom]
-        θ = [α1, α2, α3]
+        L = [d_bottom - delta_lip_bottom, b_bottom - delta_lip_bottom - delta_web_bottom, h/5 - delta_web_bottom]
+        θ = deg2rad.([Θ_bottom_lip, Θ_bottom_flange, Θ_web])
 
         #The inside radius is used for the bottom flange.
-        radius = [r1 - t, r2 - t]
+        r = [r_bottom_flange_lip - t, r_bottom_flange_web - t]
 
-        closed_or_open = 1
-
-        purlin = SectionProperties.Feature(ΔL, θ, n, radius, n_radius, closed_or_open)
-
-        #Calculate the out-to-out purlin surface coordinates.
-        xcoords_out, ycoords_out = SectionProperties.get_xy_coordinates(purlin)
-
-        #Calculate centerline purlin coordinates.
-        unitnormals = SectionProperties.surface_normals(xcoords_out, ycoords_out, closed_or_open)
-        nodenormals = SectionProperties.avg_node_normals(unitnormals, closed_or_open)
-        xcoords_center, ycoords_center = SectionProperties.xycoords_along_normal(xcoords_out, ycoords_out, nodenormals, -t/2)
+        #Get outside coords 
+        coords_out = CrossSection.generate_open(L, θ, r, n, n_radius)
+        #Get node normals on cross-section
+        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        #Get centerline coords
+        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, -t/2)
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -389,33 +365,19 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d1, b1, 
         index = length(xcoords_center)
         xcoords_center = xcoords_center .- xcoords_center[index]
 
+
     elseif cross_section_type == "C"
 
-        #Define the top C purlin surface.   For the top flange, this means the out-to-out dimensions.  For the bottom flange, the interior outside dimensions should be used.
+        L = [d_bottom, b_bottom, h/5]
+        θ = deg2rad.([Θ_bottom_lip, Θ_bottom_flange, Θ_web])
+        r = [r_bottom_flange_lip, r_bottom_flange_web]
 
-        #First calculate the correction on out-to-out length to go from the outside surface to the inside bottom flange surface.
-        delta_lip_bottom = t / tan((π - deg2rad(abs(α2 - α1))) / 2)
-        delta_web_bottom = t / tan((π - deg2rad(abs(α3 - α2))) / 2)
-
-        #Note here that the bottom flange and lip dimensions are smaller here.
-        #Use 1/5 of the web height.
-        ΔL = [d1 - delta_lip_bottom, b1 - delta_lip_bottom - delta_web_bottom, h/5 - delta_web_bottom]
-        θ = [α1, α2, α3]
-
-        #The inside radius is used for the bottom flange.
-        radius = [r1 - t, r2 - t]
-
-        closed_or_open = 1
-
-        purlin = SectionProperties.Feature(ΔL, θ, n, radius, n_radius, closed_or_open)
-
-        #Calculate the out-to-out purlin surface coordinates.
-        xcoords_out, ycoords_out = SectionProperties.get_xy_coordinates(purlin)
-
-        #Calculate centerline purlin coordinates.
-        unitnormals = SectionProperties.surface_normals(xcoords_out, ycoords_out, closed_or_open)
-        nodenormals = SectionProperties.avg_node_normals(unitnormals, closed_or_open)
-        xcoords_center, ycoords_center = SectionProperties.xycoords_along_normal(xcoords_out, ycoords_out, nodenormals, -t/2)
+        #Get outside coords 
+        coords_out = CrossSection.generate_open(L, θ, r, n, n_radius)
+        #Get node normals on cross-section
+        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        #Get centerline coords
+        xcoords_center, ycoords_center = CrossSection.Tools.get_coords_along_node_normals(coords_out[:, 1], coords_out[:, 2], unit_node_normals, -t/2)
 
         #Shift y coordinates so that the bottom purlin face is at y = 0.
         ycoords_center = ycoords_center .- minimum(ycoords_center) .+ t/2
@@ -448,33 +410,33 @@ function define_purlin_section(cross_section_dimensions, n, n_radius)
 
         cross_section_type = cross_section_dimensions[i][1]
         t = cross_section_dimensions[i][2]
-        d1 = cross_section_dimensions[i][3]
-        b1 = cross_section_dimensions[i][4]
+        d_bottom = cross_section_dimensions[i][3]
+        b_bottom = cross_section_dimensions[i][4]
         h = cross_section_dimensions[i][5]
-        b2 = cross_section_dimensions[i][6]
-        d2 = cross_section_dimensions[i][7]
-        α1 = cross_section_dimensions[i][8]
-        α2 = cross_section_dimensions[i][9]
-        α3 = cross_section_dimensions[i][10]
-        α4 = cross_section_dimensions[i][11]
-        α5 = cross_section_dimensions[i][12]
-        r1 = cross_section_dimensions[i][13]
-        r2 = cross_section_dimensions[i][14]
-        r3 = cross_section_dimensions[i][15]
-        r4 = cross_section_dimensions[i][16]
+        b_top = cross_section_dimensions[i][6]
+        d_top = cross_section_dimensions[i][7]
+        Θ_bottom_lip = cross_section_dimensions[i][8]
+        Θ_bottom_flange = cross_section_dimensions[i][9]
+        Θ_web = cross_section_dimensions[i][10]
+        Θ_top_flange = cross_section_dimensions[i][11]
+        Θ_top_lip = cross_section_dimensions[i][12]
+        r_bottom_flange_lip = cross_section_dimensions[i][13]
+        r_bottom_flange_web = cross_section_dimensions[i][14]
+        r_top_flange_web = cross_section_dimensions[i][15]
+        r_top_flange_lip = cross_section_dimensions[i][16]
 
         #Define the purlin cross-section nodes and elements.
-        purlin_node_geometry, purlin_element_info = define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n, n_radius)
+        purlin_node_geometry, purlin_element_info = define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, h, b_top, d_top, Θ_bottom_lip, Θ_bottom_flange, Θ_web, Θ_top_flange, Θ_top_lip, r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip, n, n_radius)
 
         #Calculate the purlin elastic cross-section properties.
         purlin_section_properties = CUFSM.cutwp_prop2(purlin_node_geometry, purlin_element_info)
 
         #Calculate purlin plastic neutral axis and plastic modulus.
         n_plastic = n .* 10   #Use a fine discretization to find the plastic section properties.
-        purlin_plastic_node_geometry, purlin_plastic_element_info = define_purlin_cross_section(cross_section_type, t, d1, b1, h, b2, d2, α1, α2, α3, α4, α5, r1, r2, r3, r4, n_plastic, n_radius)
+        purlin_plastic_node_geometry, purlin_plastic_element_info = define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, h, b_top, d_top, Θ_bottom_lip, Θ_bottom_flange, Θ_web, Θ_top_flange, Θ_top_lip,  r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip, n_plastic, n_radius)
 
         about_axis = "x"  #The strong axis plastic properties are needed for now.  
-        purlin_plastic_section_properties = SectionProperties.calculate_plastic_section_properties(purlin_plastic_node_geometry, purlin_plastic_element_info, about_axis)
+        purlin_plastic_section_properties = SectionProperties.Lines.calculate_plastic_section_properties(purlin_plastic_node_geometry, purlin_plastic_element_info, about_axis)
 
         cross_section_data[i] = CrossSectionData(n, n_radius, purlin_node_geometry, purlin_element_info, purlin_section_properties, purlin_plastic_section_properties)
        
@@ -495,23 +457,18 @@ function define_purlin_free_flange_section(cross_section_dimensions, n, n_radius
 
         cross_section_type = cross_section_dimensions[i][1]
         t = cross_section_dimensions[i][2]
-        d1 = cross_section_dimensions[i][3]
-        b1 = cross_section_dimensions[i][4]
+        d_bottom = cross_section_dimensions[i][3]
+        b_bottom = cross_section_dimensions[i][4]
         h = cross_section_dimensions[i][5]
-        b2 = cross_section_dimensions[i][6]
-        d2 = cross_section_dimensions[i][7]
-        α1 = cross_section_dimensions[i][8]
-        α2 = cross_section_dimensions[i][9]
-        α3 = cross_section_dimensions[i][10]
-        α4 = cross_section_dimensions[i][11]
-        α5 = cross_section_dimensions[i][12]
-        r1 = cross_section_dimensions[i][13]
-        r2 = cross_section_dimensions[i][14]
-        r3 = cross_section_dimensions[i][15]
-        r4 = cross_section_dimensions[i][16]
+        Θ_bottom_lip = cross_section_dimensions[i][8]
+        Θ_bottom_flange = cross_section_dimensions[i][9]
+        Θ_web = cross_section_dimensions[i][10]
+        r_bottom_flange_lip = cross_section_dimensions[i][13]
+        r_bottom_flange_web = cross_section_dimensions[i][14]
+ 
 
         #Define the purlin free flange cross-section nodes and elements.
-        purlin_free_flange_node_geometry, purlin_free_flange_element_info = define_purlin_free_flange_cross_section(cross_section_type, t, d1, b1, h, α1, α2, α3, r1, r2, n, n_radius)
+        purlin_free_flange_node_geometry, purlin_free_flange_element_info = define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom, b_bottom, h, Θ_bottom_lip, Θ_bottom_flange, Θ_web, r_bottom_flange_lip, r_bottom_flange_web, n, n_radius)
 
         #Calculate the purlin free flange cross-section properties.
         purlin_free_flange_section_properties = CUFSM.cutwp_prop2(purlin_free_flange_node_geometry, purlin_free_flange_element_info)
@@ -1438,8 +1395,12 @@ function calculate_shear_strength(purlin_line)
         Fcrv = S100AISI.v16.g232(E, μ, kv, h_flat, t)
         Vcr = S100AISI.v16.g231(h_flat, t, Fcrv)
 
+        #Calculate shear yield force.
+        Aw, Vy = S100AISI.v16.g215_6(h_flat, t, Fy)
+
         #Calculate shear buckling strength.
-        Vn, eVn = S100AISI.v16.g21(h_flat, t, Fy, Vcr, purlin_line.inputs.design_code)
+        # Vn, eVn = S100AISI.v16.g21(h_flat, t, Fy, Vcr, purlin_line.inputs.design_code)
+        Vn, eVn = S100AISI.v16.g21_3(Vcr, Vy, purlin_line.inputs.design_code)
 
         shear_strength[i] = ShearStrengthData(h_flat, kv, Fcrv, Vcr, Vn, eVn)
 

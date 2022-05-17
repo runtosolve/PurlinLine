@@ -1,5 +1,8 @@
+using Pkg
+Pkg.activate(".")
+
 using PurlinLine
-# using StructuresKit
+
 
 design_code = "AISI S100-16 ASD"
 
