@@ -1,3 +1,7 @@
+using Pkg
+
+Pkg.activate(".")
+
 using PurlinLine
 
 design_code = "AISI S100-16 ASD"
@@ -52,82 +56,82 @@ bridging_locations =[ ]
 purlin_line = PurlinLine.build(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
 # purlin_line.applied_pressure = 10 / 1000 / 144 #psf to kips/in^2
 
-purlin_line.cross_section_data[1].node_geometry
+# purlin_line.cross_section_data[1].node_geometry
 
-using Plots
+# using Plots
 
-plot(purlin_line.cross_section_data[1].node_geometry[:,1], purlin_line.cross_section_data[1].node_geometry[:,2], seriestype = :scatter, aspect_ratio =:equal)
+# plot(purlin_line.cross_section_data[1].node_geometry[:,1], purlin_line.cross_section_data[1].node_geometry[:,2], seriestype = :scatter, aspect_ratio =:equal)
 
-plot(purlin_line.free_flange_cross_section_data[1].node_geometry[:,1], purlin_line.free_flange_cross_section_data[1].node_geometry[:,2], seriestype = :scatter)
-
-
-purlin_line.loading_direction = "gravity"
-
-#Perform a test to collapse.
-purlin_line = PurlinLine.test(purlin_line)
-
-purlin_line.applied_pressure * 1000 * 144
-
-purlin_line.cross_section_data[1].plastic_section_properties
-
-using Plots
-plot(purlin_line.model.z, purlin_line.free_flange_model.u)
-
-plot(purlin_line.model.z, purlin_line.free_flange_model.u)
-
-plot(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_Mxx)
-plot!(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_Myy)
-plot!(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_B)
-plot!(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_Myy_freeflange)
-
-purlin_line.failure_limit_state
-
-purlin_line.failure_location
-
-plot(purlin_line.model.z, purlin_line.free_flange_internal_forces.P)
-
-plot(purlin_line.model.z, purlin_line.free_flange_model.kx)
-
-calculate_free_flange_shear_flow_properties(purlin_line)
+# plot(purlin_line.free_flange_cross_section_data[1].node_geometry[:,1], purlin_line.free_flange_cross_section_data[1].node_geometry[:,2], seriestype = :scatter)
 
 
-#' Plot the purlin local buckling mode shape.
-using StructuresKit
-mode_index = 2
-scale_x = 1.0
-scale_y = 1.0
-node = purlin_line.local_buckling_xx_pos[1].CUFSM_data.node
-elem = purlin_line.local_buckling_xx_pos[1].CUFSM_data.elem
-shapes = purlin_line.local_buckling_xx_pos[1].CUFSM_data.shapes
+# purlin_line.loading_direction = "gravity"
 
-StructuresKit.CUFSM.view_multi_branch_section_mode_shape(node, elem, shapes, mode_index, scale_x, scale_y)
+# #Perform a test to collapse.
+# purlin_line = PurlinLine.test(purlin_line)
 
+# purlin_line.applied_pressure * 1000 * 144
 
-#' Plot the purlin local buckling signature curve.
-num_lengths = length(purlin_line.local_buckling_xx_pos[1].CUFSM_data.lengths)
-half_wavelengths = [purlin_line.local_buckling_xx_pos[1].CUFSM_data.curve[i,1][1] for i=1:num_lengths]
-load_factors = [purlin_line.local_buckling_xx_pos[1].CUFSM_data.curve[i,1][2] for i=1:num_lengths]
-plot(half_wavelengths, load_factors, legend = false)
+# purlin_line.cross_section_data[1].plastic_section_properties
 
+# using Plots
+# plot(purlin_line.model.z, purlin_line.free_flange_model.u)
 
-#' Plot the purlin local buckling mode shape.
-using StructuresKit
-mode_index = 3
-scale_x = 1.0
-scale_y = 1.0
-node = purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.node
-elem = purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.elem
-shapes = purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.shapes
+# plot(purlin_line.model.z, purlin_line.free_flange_model.u)
 
-StructuresKit.CUFSM.view_multi_branch_section_mode_shape(node, elem, shapes, mode_index, scale_x, scale_y)
+# plot(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_Mxx)
+# plot!(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_Myy)
+# plot!(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_B)
+# plot!(purlin_line.model.z, purlin_line.flexure_torsion_demand_to_capacity.action_Myy_freeflange)
 
+# purlin_line.failure_limit_state
+
+# purlin_line.failure_location
+
+# plot(purlin_line.model.z, purlin_line.free_flange_internal_forces.P)
+
+# plot(purlin_line.model.z, purlin_line.free_flange_model.kx)
+
+# calculate_free_flange_shear_flow_properties(purlin_line)
 
 
-#' Plot the purlin local buckling signature curve.
-num_lengths = length(purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.lengths)
-half_wavelengths = [purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.curve[i,1][1] for i=1:num_lengths]
-load_factors = [purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.curve[i,1][2] for i=1:num_lengths]
-plot(half_wavelengths, load_factors, legend = false)
+# #' Plot the purlin local buckling mode shape.
+# using StructuresKit
+# mode_index = 2
+# scale_x = 1.0
+# scale_y = 1.0
+# node = purlin_line.local_buckling_xx_pos[1].CUFSM_data.node
+# elem = purlin_line.local_buckling_xx_pos[1].CUFSM_data.elem
+# shapes = purlin_line.local_buckling_xx_pos[1].CUFSM_data.shapes
+
+# StructuresKit.CUFSM.view_multi_branch_section_mode_shape(node, elem, shapes, mode_index, scale_x, scale_y)
+
+
+# #' Plot the purlin local buckling signature curve.
+# num_lengths = length(purlin_line.local_buckling_xx_pos[1].CUFSM_data.lengths)
+# half_wavelengths = [purlin_line.local_buckling_xx_pos[1].CUFSM_data.curve[i,1][1] for i=1:num_lengths]
+# load_factors = [purlin_line.local_buckling_xx_pos[1].CUFSM_data.curve[i,1][2] for i=1:num_lengths]
+# plot(half_wavelengths, load_factors, legend = false)
+
+
+# #' Plot the purlin local buckling mode shape.
+# using StructuresKit
+# mode_index = 3
+# scale_x = 1.0
+# scale_y = 1.0
+# node = purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.node
+# elem = purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.elem
+# shapes = purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.shapes
+
+# StructuresKit.CUFSM.view_multi_branch_section_mode_shape(node, elem, shapes, mode_index, scale_x, scale_y)
+
+
+
+# #' Plot the purlin local buckling signature curve.
+# num_lengths = length(purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.lengths)
+# half_wavelengths = [purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.curve[i,1][1] for i=1:num_lengths]
+# load_factors = [purlin_line.distortional_buckling_xx_pos[1].CUFSM_data.curve[i,1][2] for i=1:num_lengths]
+# plot(half_wavelengths, load_factors, legend = false)
 
 
 

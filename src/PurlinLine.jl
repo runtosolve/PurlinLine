@@ -285,7 +285,7 @@ function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, 
         r = [r_bottom_flange_lip - t, r_bottom_flange_web - t, r_top_flange_web, r_top_flange_lip]
 
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, r, n, n_radius)
+        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
@@ -305,7 +305,7 @@ function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, 
         r = [r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip]
         
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, r, n, n_radius)
+        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
@@ -352,7 +352,7 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom
         r = [r_bottom_flange_lip - t, r_bottom_flange_web - t]
 
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, r, n, n_radius)
+        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
@@ -373,7 +373,7 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom
         r = [r_bottom_flange_lip, r_bottom_flange_web]
 
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, r, n, n_radius)
+        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
         unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
