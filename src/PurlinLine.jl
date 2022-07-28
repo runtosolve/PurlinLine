@@ -2181,6 +2181,11 @@ function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
 
     Β = S100AISI.v16.app23333.(L, Lm, M1, M2)
 
+    index = findall(x->isnan(x), Β)
+    Β[index] .= 1.3  # fix NaN problem when M2 is zero
+
+    println(Β)
+
     return Β
 
 end
@@ -2427,7 +2432,6 @@ function identify_failure_limit_state(purlin_line)
     max_DC_distortional = maximum(filter(!isnan, purlin_line.distortional_demand_to_capacity))
     max_DC_location_index[2] = findfirst(x->x≈max_DC_distortional, purlin_line.distortional_demand_to_capacity) 
 
-    
 
     max_DC_flexure_shear = maximum(purlin_line.flexure_shear_demand_to_capacity)
     max_DC_location_index[3] = findfirst(x->x≈max_DC_flexure_shear, purlin_line.flexure_shear_demand_to_capacity) 
