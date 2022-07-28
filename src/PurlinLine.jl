@@ -2424,8 +2424,10 @@ function identify_failure_limit_state(purlin_line)
     max_DC_flexure_torsion = maximum(purlin_line.flexure_torsion_demand_to_capacity.demand_to_capacity)
     max_DC_location_index[1] = findfirst(x->x≈max_DC_flexure_torsion, purlin_line.flexure_torsion_demand_to_capacity.demand_to_capacity) 
 
-    max_DC_distortional = maximum(purlin_line.distortional_demand_to_capacity)
+    max_DC_distortional = maximum(filter(!isnan, purlin_line.distortional_demand_to_capacity))
     max_DC_location_index[2] = findfirst(x->x≈max_DC_distortional, purlin_line.distortional_demand_to_capacity) 
+
+    
 
     max_DC_flexure_shear = maximum(purlin_line.flexure_shear_demand_to_capacity)
     max_DC_location_index[3] = findfirst(x->x≈max_DC_flexure_shear, purlin_line.flexure_shear_demand_to_capacity) 
