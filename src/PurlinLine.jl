@@ -2184,8 +2184,6 @@ function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
     index = findall(x->isnan(x), Β)
     Β[index] .= 1.3  # fix NaN problem when M2 is zero
 
-    println(Β)
-
     return Β
 
 end
