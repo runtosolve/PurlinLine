@@ -23,17 +23,22 @@ struct Inputs
     roof_slope::Float64
     cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}
     material_properties::Vector{NTuple{4, Float64}}
-    deck_details::Tuple{String, Float64, Float64, Float64, Float64}
+    deck_details::Any   #through-fastened or standing seam
     deck_material_properties::NTuple{4, Float64}
     frame_flange_width::Float64
     support_locations::Vector{Float64}
     purlin_frame_connections::String
-    bridging_locations::Vector{Float64}
-  
+    bridging_locations::Vector{Float64}  
 
 end
 
 
+
+# Inputs(design_code::String, segments::Vector{Tuple{Float64, Float64, Int64, Int64}}, spacing::Float64, roof_slope::Float64, cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}, material_properties::Vector{NTuple{4, Float64}}, deck_details::Tuple{String, Float64, Float64, Float64, Float64}, 
+# deck_material_properties::NTuple{4, Float64}, frame_flange_width::Float64, support_locations::Vector{Float64}, purlin_frame_connections::String, 
+# bridging_locations::Vector{Float64} ) = Inputs(design_code::String, segments::Vector{Tuple{Float64, Float64, Int64, Int64}}, spacing::Float64, roof_slope::Float64, cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}, material_properties::Vector{NTuple{4, Float64}}, deck_details::Tuple{String, Float64, Float64, Float64, Float64}, 
+# deck_material_properties::NTuple{4, Float64}, frame_flange_width::Float64, support_locations::Vector{Float64}, purlin_frame_connections::String, 
+# bridging_locations::Vector{Float64} )
 
 Base.@kwdef struct CrossSectionData
 
@@ -48,14 +53,16 @@ end
 
 struct BracingData
 
-       kp::Float64
-       kϕ::Float64
-       kϕ_dist::Float64 
-       kx::Float64 
-       Lcrd::Float64
-       Lm::Float64
+    kp::Float64
+    rotational_stiffness::Any
+    kϕ::Float64
+    kϕ_dist::Float64 
+    kx::Float64 
+    Lcrd::Float64
+    Lm::Float64
 
 end
+
 
 struct FreeFlangeData
 
@@ -627,7 +634,7 @@ function define_deck_bracing_properties(purlin_line)
             end
 
             #Calculate the rotational stiffness provided to the purlin by the screw-fastened connection between the deck and the purlin.  It is assumed that the deck flexural stiffness is much higher than the connection stiffness.
-            kϕ = ScrewConnections.cfs_rot_screwfastened_k(b_top, c, deck_purlin_fastener_spacing, t_purlin, kp, E_purlin, CorZ)
+            rotational_stiffness = ScrewConnections.rotational_stiffness(b_top, c, deck_purlin_fastener_spacing, t_purlin, kp, E_purlin, purlin_line.inputs.cross_section_dimensions[section_index][1])
 
             #Calculate the purlin distortional buckling half-wavelength.
 
@@ -639,7 +646,7 @@ function define_deck_bracing_properties(purlin_line)
 
             #If Lcrd is longer than the fastener spacing, then the distortional buckling will be restrained by the deck.
             if Lcrd >= Lm
-                kϕ_dist = kϕ
+                kϕ_dist = rotational_stiffness.kϕ
             else
                 kϕ_dist = 0.0
             end
@@ -653,7 +660,7 @@ function define_deck_bracing_properties(purlin_line)
             kx = Ke / deck_purlin_fastener_spacing
 
             #Collect all the outputs.
-            bracing_data[i] = BracingData(kp, kϕ, kϕ_dist, kx, Lcrd, Lm)
+            bracing_data[i] = BracingData(kp, rotational_stiffness, rotational_stiffness.kϕ, kϕ_dist, kx, Lcrd, Lm)
 
         end
 
@@ -729,9 +736,10 @@ function define_deck_bracing_properties(purlin_line)
 
             kx = 0.002  #From Cronin and Moen (2012), Figure 4.8  kips/in/in, https://vtechworks.lib.vt.edu/bitstream/handle/10919/18711/Flexural%20Capacity%20Prediction%20Method%20for%20an%20Open%20Web%20Joist%20Laterally%20Braced%20by%20a%20Standing%20Seam%20Roof%20System%20R10.pdf?sequence=1&isAllowed=y
         
+            rotational_stiffness = []   
 
             #Collect all the outputs.
-            bracing_data[i] = BracingData(kp, kϕ, kϕ_dist, kx, Lcrd, Lm)
+            bracing_data[i] = BracingData(kp, rotational_stiffness, kϕ, kϕ_dist, kx, Lcrd, Lm)
 
         end
 
