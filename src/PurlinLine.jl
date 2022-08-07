@@ -15,7 +15,7 @@ using ScrewConnections
 export build, analyze, test
 
 
-struct Inputs
+mutable struct Inputs
 
     design_code::String
     segments::Vector{Tuple{Float64, Float64, Int64, Int64}}
