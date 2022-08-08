@@ -1,6 +1,6 @@
-using Pkg
+# using Pkg
 
-Pkg.activate(".")
+# Pkg.activate(".")
 
 using PurlinLine
 
