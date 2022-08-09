@@ -2176,44 +2176,43 @@ function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
     
     spl = Spline1D(z, Mxx)
 
-    num_halfwavelengths = floor(maximum(z)/Lcrd)
+    Lm = Lcrd  
+    L = Lcrd  
 
-    z_Lcrd = 0.0:maximum(z)/num_halfwavelengths:maximum(z)
-
-    z_Lcrd_start = z_Lcrd[1:end-1]
-
-    z_Lcrd_end = z_Lcrd[2:end]
-
-    M_start = [spl(z_Lcrd_start[i]) for i in eachindex(z_Lcrd_start)]
-
-    M_end = [spl(z_Lcrd_end[i]) for i in eachindex(z_Lcrd_end)]
-
-    M1 = [minimum([abs(M_start[i]), abs(M_end[i])]) for i in eachindex(M_start)]
-    M2 = -[maximum([abs(M_start[i]), abs(M_end[i])]) for i in eachindex(M_start)]
-
-    Lm = Lcrd  .* ones(Float64, length(M1))
-    L = Lcrd  .* ones(Float64, length(M1))
-
-    Β_range = S100AISI.v16.app23333.(L, Lm, M1, M2)
-
-    Β = Array{Float64}(undef, length(z))
+    β = Array{Float64}(undef, length(z))
 
     for i in eachindex(z)
 
-        index = searchsortedfirst(z_Lcrd_start, z[i])
+        if z[i] < Lcrd/2
 
-        if index > length(z)
-            index = index - 1
+            M_start = spl(0.0)
+            M_end = spl(Lcrd/2)
+
+        elseif (maximum(z) - z[i]) < Lcrd/2
+
+            M_start = spl(maximum(z) - Lcrd/2)
+            M_end = spl(maximum(z))
+        
+        else
+
+            M_start = spl(z[i] - Lcrd/2)
+            M_end = spl(z[i] + Lcrd/2)
+
         end
 
-        Β[i] = Β_range[index]
+        M1 = minimum([abs(M_start), abs(M_end)])
+        M2 = -maximum([abs(M_start), abs(M_end)]) 
+
+        β[i] = S100AISI.v16.app23333(L, Lm, M1, M2)
 
     end
 
     index = findall(x->isnan(x), Β)
     Β[index] .= 1.3  # fix NaN problem when M2 is zero
 
-    return Β
+
+    return β
+
 
 end
 
@@ -2226,9 +2225,9 @@ function calculate_distortional_buckling_demand_to_capacity(purlin_line)
     Mcrd_xx_neg_range = [purlin_line.distortional_buckling_xx_neg[i].Mcr for i=1:num_purlin_segments]
 
     #Consider moment gradient effects on distortional buckling.
-    Β = calculate_distortional_buckling_gradient_factor(purlin_line.internal_forces.Mxx, purlin_line.model.inputs.z, purlin_line.distortional_buckling_xx_pos[1].Lcr)  #use Lcrd from first cross-section, consider improving later
+    β = calculate_distortional_buckling_gradient_factor(purlin_line.internal_forces.Mxx, purlin_line.model.inputs.z, purlin_line.distortional_buckling_xx_pos[1].Lcr)  #use Lcrd from first cross-section, consider improving later
 
-    Mcrd_xx_all = Β .* calculate_flexural_capacity_envelope(purlin_line.inputs.segments, Mcrd_xx_pos_range, Mcrd_xx_neg_range, purlin_line.internal_forces.Mxx)
+    Mcrd_xx_all = β .* calculate_flexural_capacity_envelope(purlin_line.inputs.segments, Mcrd_xx_pos_range, Mcrd_xx_neg_range, purlin_line.internal_forces.Mxx)
 
     My_range = [purlin_line.yielding_flexural_strength_xx[i].My for i=1:num_purlin_segments]
     
@@ -2244,7 +2243,7 @@ function calculate_distortional_buckling_demand_to_capacity(purlin_line)
     #check distortional buckling
     distortional_demand_to_capacity = abs.(purlin_line.internal_forces.Mxx./eMnd_xx_all)
 
-    return distortional_demand_to_capacity, eMnd_xx_all, Β
+    return distortional_demand_to_capacity, eMnd_xx_all, β
 
 end
 

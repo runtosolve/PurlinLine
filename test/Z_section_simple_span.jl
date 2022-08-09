@@ -45,3 +45,9 @@ purlin_line = PurlinLine.test(purlin_line)
 
 purlin_line.applied_pressure * 1000 * 144
 
+using Plots 
+plot(purlin_line.model.inputs.z, purlin_line.expected_strengths.eMnd_xx)
+
+plot(purlin_line.model.inputs.z, purlin_line.Β_distortional_gradient_factor)
+
+purlin_line.internal_forces.Mxx[1]
