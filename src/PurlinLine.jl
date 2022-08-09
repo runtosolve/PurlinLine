@@ -1274,49 +1274,49 @@ function calculate_distortional_flexural_strength(purlin_line)
 
     for i = 1:num_purlin_segments
 
-        #Define the material property index associated with purlin segment i.
-        material_index = purlin_line.inputs.segments[i][4]
-        section_index = purlin_line.inputs.segments[i][3]
+        # #Define the material property index associated with purlin segment i.
+        # material_index = purlin_line.inputs.segments[i][4]
+        # section_index = purlin_line.inputs.segments[i][3]
 
-        My = purlin_line.yielding_flexural_strength_xx[i].My
-        Mcrd_xx_pos = purlin_line.distortional_buckling_xx_pos[i].Mcr
-        λ_d_pos = sqrt(My/Mcrd_xx_pos)
+        # My = purlin_line.yielding_flexural_strength_xx[i].My
+        # Mcrd_xx_pos = purlin_line.distortional_buckling_xx_pos[i].Mcr
+        # λ_d_pos = sqrt(My/Mcrd_xx_pos)
 
 
-        if λ_d_pos < 0.673   #inelastic reserve is in play
+        # if λ_d_pos < 0.673   #inelastic reserve is in play
 
-            Sc = purlin_line.yielding_flexural_strength_xx[i].S_pos
-            St = purlin_line.yielding_flexural_strength_xx[i].S_neg
-            Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
-            Fy = purlin_line.inputs.material_properties[material_index][3]
+        #     Sc = purlin_line.yielding_flexural_strength_xx[i].S_pos
+        #     St = purlin_line.yielding_flexural_strength_xx[i].S_neg
+        #     Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
+        #     Fy = purlin_line.inputs.material_properties[material_index][3]
 
-            lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_pos, eMnd_xx_pos = S100AISI.v16.f43(My, Mcrd_xx_pos, Sc, St, Z, Fy, purlin_line.inputs.design_code)
+        #     lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_pos, eMnd_xx_pos = S100AISI.v16.f43(My, Mcrd_xx_pos, Sc, St, Z, Fy, purlin_line.inputs.design_code)
 
-        else
+        # else
 
             
             Mnd_xx_pos, eMnd_xx_pos = S100AISI.v16.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_pos[i].Mcr, purlin_line.inputs.design_code)
 
-        end
+        # end
 
-        Mcrd_xx_neg = purlin_line.distortional_buckling_xx_neg[i].Mcr
-        λ_d_neg = sqrt(My/Mcrd_xx_neg)
+        # Mcrd_xx_neg = purlin_line.distortional_buckling_xx_neg[i].Mcr
+        # λ_d_neg = sqrt(My/Mcrd_xx_neg)
 
 
-        if λ_d_neg < 0.673   #inelastic reserve is in play
+        # if λ_d_neg < 0.673   #inelastic reserve is in play
 
-            Sc = purlin_line.yielding_flexural_strength_xx[i].S_neg  #compression is associated with negative moment here
-            St = purlin_line.yielding_flexural_strength_xx[i].S_pos
-            Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
-            Fy = purlin_line.inputs.material_properties[material_index][3]
+        #     Sc = purlin_line.yielding_flexural_strength_xx[i].S_neg  #compression is associated with negative moment here
+        #     St = purlin_line.yielding_flexural_strength_xx[i].S_pos
+        #     Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
+        #     Fy = purlin_line.inputs.material_properties[material_index][3]
 
-            lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_neg, eMnd_xx_neg = S100AISI.v16.f43(My, Mcrd_xx_neg, Sc, St, Z, Fy, purlin_line.inputs.design_code)
+        #     lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_neg, eMnd_xx_neg = S100AISI.v16.f43(My, Mcrd_xx_neg, Sc, St, Z, Fy, purlin_line.inputs.design_code)
 
-        else
+        # else
 
             Mnd_xx_neg, eMnd_xx_neg = S100AISI.v16.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_neg[i].Mcr, purlin_line.inputs.design_code)
 
-        end
+        # end
 
         distortional_flexural_strength_xx[i] = DistortionalFlexuralStrengthData(Mnd_xx_pos, Mnd_xx_neg, eMnd_xx_pos, eMnd_xx_neg)
 
@@ -2171,15 +2171,22 @@ function calculate_flexure_torsion_demand_to_capacity(purlin_line)
 
 end
 
-
 function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
 
-
-    M_start = Mxx
-
+    
     spl = Spline1D(z, Mxx)
 
-    M_end = [spl(z[i] + Lcrd) for i in eachindex(z)]
+    num_halfwavelengths = floor(maximum(z)/Lcrd)
+
+    z_Lcrd = 0.0:maximum(z)/num_halfwavelengths:maximum(z)
+
+    z_Lcrd_start = z_Lcrd[1:end-1]
+
+    z_Lcrd_end = z_Lcrd[2:end]
+
+    M_start = [spl(z_Lcrd_start[i]) for i in eachindex(z_Lcrd_start)]
+
+    M_end = [spl(z_Lcrd_end[i]) for i in eachindex(z_Lcrd_end)]
 
     M1 = [minimum([abs(M_start[i]), abs(M_end[i])]) for i in eachindex(M_start)]
     M2 = -[maximum([abs(M_start[i]), abs(M_end[i])]) for i in eachindex(M_start)]
@@ -2187,7 +2194,21 @@ function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
     Lm = Lcrd  .* ones(Float64, length(M1))
     L = Lcrd  .* ones(Float64, length(M1))
 
-    Β = S100AISI.v16.app23333.(L, Lm, M1, M2)
+    Β_range = S100AISI.v16.app23333.(L, Lm, M1, M2)
+
+    Β = Array{Float64}(undef, length(z))
+
+    for i in eachindex(z)
+
+        index = searchsortedfirst(z_Lcrd_start, z[i])
+
+        if index > length(z)
+            index = index - 1
+        end
+
+        Β[i] = Β_range[index]
+
+    end
 
     index = findall(x->isnan(x), Β)
     Β[index] .= 1.3  # fix NaN problem when M2 is zero
@@ -2201,13 +2222,24 @@ end
 function calculate_distortional_buckling_demand_to_capacity(purlin_line)
 
     num_purlin_segments = size(purlin_line.inputs.segments)[1]
-    eMnd_xx_pos_range = [purlin_line.distortional_flexural_strength_xx[i].eMnd_pos for i=1:num_purlin_segments]
-    eMnd_xx_neg_range = [purlin_line.distortional_flexural_strength_xx[i].eMnd_neg for i=1:num_purlin_segments]
+    Mcrd_xx_pos_range = [purlin_line.distortional_buckling_xx_pos[i].Mcr for i=1:num_purlin_segments]
+    Mcrd_xx_neg_range = [purlin_line.distortional_buckling_xx_neg[i].Mcr for i=1:num_purlin_segments]
 
     #Consider moment gradient effects on distortional buckling.
     Β = calculate_distortional_buckling_gradient_factor(purlin_line.internal_forces.Mxx, purlin_line.model.inputs.z, purlin_line.distortional_buckling_xx_pos[1].Lcr)  #use Lcrd from first cross-section, consider improving later
 
-    eMnd_xx_all = Β .* calculate_flexural_capacity_envelope(purlin_line.inputs.segments, eMnd_xx_pos_range, eMnd_xx_neg_range, purlin_line.internal_forces.Mxx)
+    Mcrd_xx_all = Β .* calculate_flexural_capacity_envelope(purlin_line.inputs.segments, Mcrd_xx_pos_range, Mcrd_xx_neg_range, purlin_line.internal_forces.Mxx)
+
+    My_range = [purlin_line.yielding_flexural_strength_xx[i].My for i=1:num_purlin_segments]
+    
+    My_xx_all = calculate_flexural_capacity_envelope(purlin_line.inputs.segments, My_range, My_range, purlin_line.internal_forces.Mxx)
+
+    Mnd_xx_all = Array{Float64}(undef, length(purlin_line.internal_forces.Mxx))
+    eMnd_xx_all = Array{Float64}(undef, length(purlin_line.internal_forces.Mxx))
+
+    for i in eachindex(Mnd_xx_all)
+        Mnd_xx_all[i], eMnd_xx_all[i] = S100AISI.v16.f411(My_xx_all[i], Mcrd_xx_all[i], purlin_line.inputs.design_code)
+    end
 
     #check distortional buckling
     distortional_demand_to_capacity = abs.(purlin_line.internal_forces.Mxx./eMnd_xx_all)
@@ -2215,6 +2247,7 @@ function calculate_distortional_buckling_demand_to_capacity(purlin_line)
     return distortional_demand_to_capacity, eMnd_xx_all, Β
 
 end
+
 
 #find flexure+shear D/C
 function calculate_flexure_shear_demand_to_capacity(purlin_line)
