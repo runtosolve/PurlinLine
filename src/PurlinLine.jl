@@ -123,9 +123,11 @@ end
 struct ShearStrengthData
 
     h_flat::Float64
+    Aw::Float64
     Fcrv::Float64
     kv::Float64
     Vcr::Float64
+    Vy::Float64
     Vn::Float64
     eVn::Float64
 
@@ -1422,7 +1424,7 @@ function calculate_shear_strength(purlin_line)
         # Vn, eVn = S100AISI.v16.g21(h_flat, t, Fy, Vcr, purlin_line.inputs.design_code)
         Vn, eVn = S100AISI.v16.g21_3(Vcr, Vy, purlin_line.inputs.design_code)
 
-        shear_strength[i] = ShearStrengthData(h_flat, kv, Fcrv, Vcr, Vn, eVn)
+        shear_strength[i] = ShearStrengthData(h_flat, Aw, Fcrv, kv, Vcr, Vy, Vn, eVn)
 
     end
 
@@ -2207,8 +2209,8 @@ function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
 
     end
 
-    index = findall(x->isnan(x), Β)
-    Β[index] .= 1.3  # fix NaN problem when M2 is zero
+    index = findall(x->isnan(x), β)
+    β[index] .= 1.3  # fix NaN problem when M2 is zero
 
 
     return β
