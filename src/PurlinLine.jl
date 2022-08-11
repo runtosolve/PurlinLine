@@ -57,6 +57,7 @@ struct BracingData
     rotational_stiffness::Any
     kϕ::Float64
     kϕ_dist::Float64 
+    shear_stiffness::Any
     kx::Float64 
     Lcrd::Float64
     Lm::Float64
@@ -656,13 +657,15 @@ function define_deck_bracing_properties(purlin_line)
             #Approximate the lateral stiffness provided to the top of the purlin by the screw-fastened connection between the deck and the purlin.
 
             #Calculate the stiffness of a single screw-fastened connection.
-            Ka, ψ, α, β, Ke = ScrewConnections.cfs_trans_screwfastened_k(t_roof_deck, t_purlin, E_roof_deck, E_purlin, Fss, Fu_roof_deck, Fu_purlin, deck_purlin_fastener_diameter)
+            α = 0.27  #for steel-to-steel, monotonic from Tao and Moen 2016 Table 8
+            β = - 0.69  
+            shear_stiffness = ScrewConnections.shear_stiffness(t_roof_deck, t_purlin, E_roof_deck, E_purlin, Fss, Fu_roof_deck, Fu_purlin, deck_purlin_fastener_diameter, α, β)
 
             #Convert the discrete stiffness to a distributed stiffness, divide by the fastener spacing.
-            kx = Ke / deck_purlin_fastener_spacing
+            kx = shear_stiffness.Ke / deck_purlin_fastener_spacing
 
             #Collect all the outputs.
-            bracing_data[i] = BracingData(kp, rotational_stiffness, rotational_stiffness.kϕ, kϕ_dist, kx, Lcrd, Lm)
+            bracing_data[i] = BracingData(kp, rotational_stiffness, rotational_stiffness.kϕ, kϕ_dist, shear_stiffness, kx, Lcrd, Lm)
 
         end
 
@@ -739,9 +742,10 @@ function define_deck_bracing_properties(purlin_line)
             kx = 0.002  #From Cronin and Moen (2012), Figure 4.8  kips/in/in, https://vtechworks.lib.vt.edu/bitstream/handle/10919/18711/Flexural%20Capacity%20Prediction%20Method%20for%20an%20Open%20Web%20Joist%20Laterally%20Braced%20by%20a%20Standing%20Seam%20Roof%20System%20R10.pdf?sequence=1&isAllowed=y
         
             rotational_stiffness = []   
+            shear_stiffness = []
 
             #Collect all the outputs.
-            bracing_data[i] = BracingData(kp, rotational_stiffness, kϕ, kϕ_dist, kx, Lcrd, Lm)
+            bracing_data[i] = BracingData(kp, rotational_stiffness, kϕ, kϕ_dist, shear_stiffness, kx, Lcrd, Lm)
 
         end
 

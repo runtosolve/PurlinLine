@@ -41,7 +41,7 @@ purlin_line = PurlinLine.build(design_code, segments, spacing, roof_slope, cross
 purlin_line.loading_direction = "gravity"
 
 #Perform a test to collapse.
-purlin_line = PurlinLine.test(purlin_line)
+purlin_line = PurlinLine.test(purlin_line);
 
 purlin_line.applied_pressure * 1000 * 144
 
