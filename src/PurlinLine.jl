@@ -2569,7 +2569,7 @@ function test(purlin_line)
         purlin_line = PurlinLine.analyze(purlin_line)
         max_DC = find_max_demand_to_capacity(purlin_line)
 
-        residual = 1.0 - abs(max_DC)
+        residual = abs(1.0 - abs(max_DC))
 
         num_iterations_to_failure += 1
 
