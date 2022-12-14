@@ -1,7 +1,8 @@
 module UI
 
-using PurlinLine, Plots, LinesCurvesNodes, CrossSection
+using Plots, LinesCurvesNodes, CrossSection
 
+using ..PurlinLine
 
 function define_lap_section_types(purlin_size_span_assignment)
 
@@ -318,5 +319,47 @@ function roof_UI_mapper(purlin_spans, purlin_laps, purlin_spacing, roof_slope, p
 	purlin_line_uplift = PurlinLine.test(purlin_line_uplift)
 
 	return purlin_line_gravity, purlin_line_uplift
+
+end
+
+
+function generate_purlin_geometry(t, xcoords_center, ycoords_center, roof_slope)
+
+	center_nodes = [xcoords_center ycoords_center zeros(Float64, length(xcoords_center))]
+
+	center_nodes_rotated = LinesCurvesNodes.rotate_nodes(center_nodes, rotation_axis = "z", rotation_center = [0.0, 0.0, 0.0], θ=atan(roof_slope))
+	
+	cross_section = [[xcoords_center[i], ycoords_center[i]] for i in eachindex(xcoords_center)]
+	
+	unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(cross_section)
+	
+	outside = CrossSection.Tools.get_coords_along_node_normals(cross_section, unit_node_normals, t/2)
+	X = [outside[i][1] for i in eachindex(outside)]
+	Y = [outside[i][2] for i in eachindex(outside)]
+	out_nodes = [X Y zeros(Float64, length(xcoords_center))]
+	out_nodes_rotated = LinesCurvesNodes.rotate_nodes(out_nodes, rotation_axis = "z", rotation_center = [0.0, 0.0, 0.0], θ=atan(roof_slope))
+	
+	inside = CrossSection.Tools.get_coords_along_node_normals(cross_section, unit_node_normals, -t/2)
+	X = [inside[i][1] for i in eachindex(inside)]
+	Y = [inside[i][2] for i in eachindex(inside)]
+	in_nodes = [X Y zeros(Float64, length(xcoords_center))]
+	in_nodes_rotated = LinesCurvesNodes.rotate_nodes(in_nodes, rotation_axis = "z", rotation_center = [0.0, 0.0, 0.0], θ=atan(roof_slope))
+
+	return center_nodes_rotated, out_nodes_rotated, in_nodes_rotated
+	
+end
+
+function plot_purlin_geometry(t, xcoords_center, ycoords_center, roof_slope)
+
+	center_nodes, out_nodes, in_nodes = generate_purlin_geometry(t, xcoords_center, ycoords_center, roof_slope)
+
+	plot(center_nodes[:,1], center_nodes[:,2], aspect_ratio=:equal, linecolor = :grey, legend=false)
+
+	plot!(out_nodes[:,1], out_nodes[:,2], aspect_ratio=:equal, linecolor = :grey, legend=false)
+
+	plot!(in_nodes[:,1], in_nodes[:,2], aspect_ratio=:equal, linecolor = :grey, legend=false)
+	
+end
+
 
 end
