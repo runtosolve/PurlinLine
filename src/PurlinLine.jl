@@ -12,6 +12,10 @@ using ThinWalledBeam
 using ThinWalledBeamColumn
 using ScrewConnections
 
+export UI
+include("UI.jl")
+using .UI
+
 export build, analyze, test
 
 
