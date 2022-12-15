@@ -1,6 +1,6 @@
 module UI
 
-using Plots, LinesCurvesNodes, CrossSection
+using  LinesCurvesNodes, CrossSection, Plots
 
 using ..PurlinLine
 
