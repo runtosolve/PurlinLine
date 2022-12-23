@@ -2,7 +2,15 @@
 
 julia_version = "1.8.3"
 manifest_format = "2.0"
-project_hash = "ba06b3be65bc8ace5a2dd0952aac540a746549b0"
+project_hash = "93803154771955018156ac68ed5881eed1e13a0d"
+
+[[deps.AISIS100]]
+deps = ["CSV", "DataFrames", "Unitful", "UnitfulUS"]
+git-tree-sha1 = "632e11b7e61e67d3603b7b496a06fd2ebc8a91cb"
+repo-rev = "main"
+repo-url = "https://github.com/runtosolve/AISIS100.jl.git"
+uuid = "01f7396e-a581-4110-84fa-e8964400bef8"
+version = "0.1.0"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1539,14 +1547,6 @@ deps = ["ExprTools", "SHA", "Serialization"]
 git-tree-sha1 = "50314d2ef65fce648975a8e80ae6d8409ebbf835"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
 version = "0.5.5"
-
-[[deps.S100AISI]]
-deps = ["CSV", "DataFrames", "Unitful", "UnitfulUS"]
-git-tree-sha1 = "e72073dd49655759227bf9920ea697a3c8c69b45"
-repo-rev = "main"
-repo-url = "https://github.com/runtosolve/S100AISI.jl.git"
-uuid = "01f7396e-a581-4110-84fa-e8964400bef8"
-version = "0.1.0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"

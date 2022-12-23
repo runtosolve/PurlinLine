@@ -4,7 +4,7 @@ using Base: String, Float64
 using CUFSM
 using Dierckx
 using NumericalIntegration
-using S100AISI
+using AISIS100
 using SectionProperties
 using CrossSection
 using InternalForces
@@ -646,10 +646,10 @@ function define_deck_bracing_properties(purlin_line)
             #Calculate the purlin distortional buckling half-wavelength.
 
             #Calculate top flange + lip section properties.
-            Af, Jf, Ixf, Iyf, Ixyf, Cwf, xof,  hxf, hyf, yof = S100AISI.v16.table23131(CorZ, t_purlin, b_top, d_top, θ_top)
+            Af, Jf, Ixf, Iyf, Ixyf, Cwf, xof,  hxf, hyf, yof = AISIS100.v16.table23131(CorZ, t_purlin, b_top, d_top, θ_top)
 
             #Calculate the purlin distortional buckling half-wavelength.
-            Lcrd, L = S100AISI.v16.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
+            Lcrd, L = AISIS100.v16.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
 
             #If Lcrd is longer than the fastener spacing, then the distortional buckling will be restrained by the deck.
             if Lcrd >= Lm
@@ -727,10 +727,10 @@ function define_deck_bracing_properties(purlin_line)
             #Calculate the purlin distortional buckling half-wavelength.
 
             #Calculate top flange + lip section properties.
-            Af, Jf, Ixf, Iyf, Ixyf, Cwf, xof,  hxf, hyf, yof = S100AISI.v16.table23131(CorZ, t_purlin, b_top, d_top, θ_top)
+            Af, Jf, Ixf, Iyf, Ixyf, Cwf, xof,  hxf, hyf, yof = AISIS100.v16.table23131(CorZ, t_purlin, b_top, d_top, θ_top)
 
             #Calculate the purlin distortional buckling half-wavelength.
-            Lcrd, L = S100AISI.v16.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
+            Lcrd, L = AISIS100.v16.app23334(ho, μ_purlin, t_purlin, Ixf, xof, hxf, Cwf, Ixyf, Iyf, Lm)
 
             #If Lcrd is longer than the clip spacing, then the distortional buckling will be restrained by the deck.
             if Lcrd >= Lm
@@ -1164,7 +1164,7 @@ function calculate_yielding_flexural_strength(purlin_line)
         # end
 
         Mcrℓ_yy_free_flange = 10.0^10 #Make this a big number so we just get back eMy
-        My_yy_free_flange, eMy_yy_free_flange = S100AISI.v16.f321(My_yy_free_flange, Mcrℓ_yy_free_flange, purlin_line.inputs.design_code)
+        My_yy_free_flange, eMy_yy_free_flange = AISIS100.v16.f321(My_yy_free_flange, Mcrℓ_yy_free_flange, purlin_line.inputs.design_code)
 
         yielding_flexural_strength_free_flange_yy[i] = YieldingFlexuralStrengthData(Syy_pos_free_flange, Syy_neg_free_flange, My_yy_pos_free_flange, My_yy_neg_free_flange, My_yy_free_flange, eMy_yy_free_flange)
 
@@ -1211,11 +1211,11 @@ function calculate_local_global_flexural_strength(purlin_line)
             St = purlin_line.yielding_flexural_strength_xx[i].S_neg
             Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
             Fy = purlin_line.inputs.material_properties[material_index][3]
-            lambda_l, Cyl, Mp, Myc, Myt3, Mnℓ_xx_pos, eMnℓ_xx_pos = S100AISI.v16.f323(Mne_xx, Mcrℓ_xx_pos, Sc, St, Z, Fy, purlin_line.inputs.design_code)
+            lambda_l, Cyl, Mp, Myc, Myt3, Mnℓ_xx_pos, eMnℓ_xx_pos = AISIS100.v16.f323(Mne_xx, Mcrℓ_xx_pos, Sc, St, Z, Fy, purlin_line.inputs.design_code)
 
         else   #no inelastic reserve
 
-            Mnℓ_xx_pos, eMnℓ_xx_pos =  S100AISI.v16.f321(Mne_xx, purlin_line.local_buckling_xx_pos[i].Mcr, purlin_line.inputs.design_code)
+            Mnℓ_xx_pos, eMnℓ_xx_pos =  AISIS100.v16.f321(Mne_xx, purlin_line.local_buckling_xx_pos[i].Mcr, purlin_line.inputs.design_code)
 
         end
 
@@ -1229,11 +1229,11 @@ function calculate_local_global_flexural_strength(purlin_line)
             St = purlin_line.yielding_flexural_strength_xx[i].S_pos
             Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
             Fy = purlin_line.inputs.material_properties[material_index][3]
-            lambda_l, Cyl, Mp, Myc, Myt3, Mnℓ_xx_neg, eMnℓ_xx_neg = S100AISI.v16.f323(Mne_xx, Mcrℓ_xx_neg, Sc, St, Z, Fy, purlin_line.inputs.design_code)
+            lambda_l, Cyl, Mp, Myc, Myt3, Mnℓ_xx_neg, eMnℓ_xx_neg = AISIS100.v16.f323(Mne_xx, Mcrℓ_xx_neg, Sc, St, Z, Fy, purlin_line.inputs.design_code)
 
         else   #no inelastic reserve
 
-            Mnℓ_xx_neg, eMnℓ_xx_neg =  S100AISI.v16.f321(Mne_xx, purlin_line.local_buckling_xx_neg[i].Mcr, purlin_line.inputs.design_code)
+            Mnℓ_xx_neg, eMnℓ_xx_neg =  AISIS100.v16.f321(Mne_xx, purlin_line.local_buckling_xx_neg[i].Mcr, purlin_line.inputs.design_code)
 
         end
 
@@ -1242,9 +1242,9 @@ function calculate_local_global_flexural_strength(purlin_line)
         ###weak axis flexure, local-global interaction
         Mne_yy = purlin_line.yielding_flexural_strength_yy[i].My
 
-        Mnℓ_yy_pos, eMnℓ_yy_pos = S100AISI.v16.f321(Mne_yy, purlin_line.local_buckling_yy_pos[i].Mcr, purlin_line.inputs.design_code)
+        Mnℓ_yy_pos, eMnℓ_yy_pos = AISIS100.v16.f321(Mne_yy, purlin_line.local_buckling_yy_pos[i].Mcr, purlin_line.inputs.design_code)
 
-        Mnℓ_yy_neg, eMnℓ_yy_neg = S100AISI.v16.f321(Mne_yy, purlin_line.local_buckling_yy_neg[i].Mcr, purlin_line.inputs.design_code)
+        Mnℓ_yy_neg, eMnℓ_yy_neg = AISIS100.v16.f321(Mne_yy, purlin_line.local_buckling_yy_neg[i].Mcr, purlin_line.inputs.design_code)
 
         local_global_flexural_strength_yy[i] = LocalGlobalFlexuralStrengthData(Mne_yy, Mnℓ_yy_pos, Mnℓ_yy_neg, eMnℓ_yy_pos, eMnℓ_yy_neg)
 
@@ -1254,9 +1254,9 @@ function calculate_local_global_flexural_strength(purlin_line)
 
         #Assume no local buckling for now in the free flange strength calculation.  Set Mcrℓ to Mne times a big number. 
 
-        Mnℓ_yy_pos_free_flange, eMnℓ_yy_pos_free_flange = S100AISI.v16.f321(Mne_yy_free_flange, Mne_yy_free_flange * 1000, purlin_line.inputs.design_code)
+        Mnℓ_yy_pos_free_flange, eMnℓ_yy_pos_free_flange = AISIS100.v16.f321(Mne_yy_free_flange, Mne_yy_free_flange * 1000, purlin_line.inputs.design_code)
 
-        Mnℓ_yy_neg_free_flange, eMnℓ_yy_neg_free_flange = S100AISI.v16.f321(Mne_yy_free_flange, Mne_yy_free_flange * 1000, purlin_line.inputs.design_code)
+        Mnℓ_yy_neg_free_flange, eMnℓ_yy_neg_free_flange = AISIS100.v16.f321(Mne_yy_free_flange, Mne_yy_free_flange * 1000, purlin_line.inputs.design_code)
 
         local_global_flexural_strength_free_flange_yy[i] = LocalGlobalFlexuralStrengthData(Mne_yy_free_flange, Mnℓ_yy_pos_free_flange, Mnℓ_yy_neg_free_flange, eMnℓ_yy_pos_free_flange, eMnℓ_yy_neg_free_flange)
 
@@ -1300,12 +1300,12 @@ function calculate_distortional_flexural_strength(purlin_line)
         #     Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
         #     Fy = purlin_line.inputs.material_properties[material_index][3]
 
-        #     lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_pos, eMnd_xx_pos = S100AISI.v16.f43(My, Mcrd_xx_pos, Sc, St, Z, Fy, purlin_line.inputs.design_code)
+        #     lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_pos, eMnd_xx_pos = AISIS100.v16.f43(My, Mcrd_xx_pos, Sc, St, Z, Fy, purlin_line.inputs.design_code)
 
         # else
 
             
-            Mnd_xx_pos, eMnd_xx_pos = S100AISI.v16.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_pos[i].Mcr, purlin_line.inputs.design_code)
+            Mnd_xx_pos, eMnd_xx_pos = AISIS100.v16.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_pos[i].Mcr, purlin_line.inputs.design_code)
 
         # end
 
@@ -1320,11 +1320,11 @@ function calculate_distortional_flexural_strength(purlin_line)
         #     Z =  purlin_line.cross_section_data[section_index].plastic_section_properties.Z
         #     Fy = purlin_line.inputs.material_properties[material_index][3]
 
-        #     lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_neg, eMnd_xx_neg = S100AISI.v16.f43(My, Mcrd_xx_neg, Sc, St, Z, Fy, purlin_line.inputs.design_code)
+        #     lambda_d, Cyd, Mp, Myc, Myt3, Mnd_xx_neg, eMnd_xx_neg = AISIS100.v16.f43(My, Mcrd_xx_neg, Sc, St, Z, Fy, purlin_line.inputs.design_code)
 
         # else
 
-            Mnd_xx_neg, eMnd_xx_neg = S100AISI.v16.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_neg[i].Mcr, purlin_line.inputs.design_code)
+            Mnd_xx_neg, eMnd_xx_neg = AISIS100.v16.f411(purlin_line.yielding_flexural_strength_xx[i].My, purlin_line.distortional_buckling_xx_neg[i].Mcr, purlin_line.inputs.design_code)
 
         # end
 
@@ -1365,7 +1365,7 @@ function calculate_torsion_strength(purlin_line)
         #This is the maximum magnitude of the warping stress function.  
         Wn = maximum(abs.(purlin_line.cross_section_data[section_index].section_properties.wn))
 
-        Bn, eBn = S100AISI.v24.h411(Cw, Fy, Wn, purlin_line.inputs.design_code)
+        Bn, eBn = AISIS100.v24.h411(Cw, Fy, Wn, purlin_line.inputs.design_code)
 
         torsion_strength[i] = TorsionStrengthData(Wn, Bn, eBn)
 
@@ -1418,19 +1418,19 @@ function calculate_shear_strength(purlin_line)
         h_flat = full_web_depth - bottom_flange_web_outside_radius - top_flange_web_outside_radius
 
         #Calculate plate buckling coefficient.
-        # kv  = S100AISI.v16.g233(a, h_flat)
+        # kv  = AISIS100.v16.g233(a, h_flat)
         kv = 5.34 #unreinforced web
 
         #Calculate shear buckling stress.
-        Fcrv = S100AISI.v16.g232(E, μ, kv, h_flat, t)
-        Vcr = S100AISI.v16.g231(h_flat, t, Fcrv)
+        Fcrv = AISIS100.v16.g232(E, μ, kv, h_flat, t)
+        Vcr = AISIS100.v16.g231(h_flat, t, Fcrv)
 
         #Calculate shear yield force.
-        Aw, Vy = S100AISI.v16.g215_6(h_flat, t, Fy)
+        Aw, Vy = AISIS100.v16.g215_6(h_flat, t, Fy)
 
         #Calculate shear buckling strength.
-        # Vn, eVn = S100AISI.v16.g21(h_flat, t, Fy, Vcr, purlin_line.inputs.design_code)
-        Vn, eVn = S100AISI.v16.g21_3(Vcr, Vy, purlin_line.inputs.design_code)
+        # Vn, eVn = AISIS100.v16.g21(h_flat, t, Fy, Vcr, purlin_line.inputs.design_code)
+        Vn, eVn = AISIS100.v16.g21_3(Vcr, Vy, purlin_line.inputs.design_code)
 
         shear_strength[i] = ShearStrengthData(h_flat, Aw, Fcrv, kv, Vcr, Vy, Vn, eVn)
 
@@ -1500,7 +1500,7 @@ function calculate_web_crippling_strength(purlin_line)
         if purlin_line.inputs.cross_section_dimensions[section_index][1] == "Z"
 
             #Use AISI S100-16 Table G5-3 for Z-sections.
-            table_g53 = S100AISI.v16.table_g53()  
+            table_g53 = AISIS100.v16.table_g53()  
            
 
             web_crippling_coeff = filter(row -> row.support_condition == "Fastened to Support", table_g53)
@@ -1518,14 +1518,14 @@ function calculate_web_crippling_strength(purlin_line)
             Ω_w = web_crippling_coeff.ASD[1]
             ϕ_w_LSD = web_crippling_coeff.LSD[1]
 
-            Pn, ePn = S100AISI.v16.g51(t, h_flat, Fy, θ, C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, purlin_line.inputs.design_code)
+            Pn, ePn = AISIS100.v16.g51(t, h_flat, Fy, θ, C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, purlin_line.inputs.design_code)
 
             web_crippling[i] = WebCripplingData(web_crippling_coeff.support_condition[1], web_crippling_coeff.flange_condition[1], web_crippling_coeff.load_case[1], web_crippling_coeff.load_location[1], C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, Pn, ePn)
 
         elseif purlin_line.inputs.cross_section_dimensions[section_index][1] == "C"
 
             #Use AISI S100-16 Table G5-2 for C-sections.
-            table_g52 = S100AISI.v16.table_g52()  
+            table_g52 = AISIS100.v16.table_g52()  
            
 
             web_crippling_coeff = filter(row -> row.support_condition == "Fastened to Support", table_g52)
@@ -1543,7 +1543,7 @@ function calculate_web_crippling_strength(purlin_line)
             Ω_w = web_crippling_coeff.ASD[1]
             ϕ_w_LSD = web_crippling_coeff.LSD[1]
 
-            Pn, ePn = S100AISI.v16.g51(t, h_flat, Fy, θ, C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, purlin_line.inputs.design_code)
+            Pn, ePn = AISIS100.v16.g51(t, h_flat, Fy, θ, C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, purlin_line.inputs.design_code)
 
             web_crippling[i] = WebCripplingData(web_crippling_coeff.support_condition[1], web_crippling_coeff.flange_condition[1], web_crippling_coeff.load_case[1], web_crippling_coeff.load_location[1], C, C_R, R, C_N, N, C_h, ϕ_w, Ω_w, ϕ_w_LSD, Pn, ePn)
 
@@ -2165,7 +2165,7 @@ function calculate_flexure_torsion_demand_to_capacity(purlin_line)
     end
 
 
-    results = S100AISI.v24.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, free_flange_moment, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
+    results = AISIS100.v24.h42.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, purlin_line.internal_forces.B, free_flange_moment, eMnℓ_xx_all, eMnℓ_yy_all, eBn_all, eMnℓ_yy_free_flange_all)
 
     action_Mx = [x[1] for x in results]
     action_My = [x[2] for x in results]
@@ -2213,7 +2213,7 @@ function calculate_distortional_buckling_gradient_factor(Mxx, z, Lcrd)
         M1 = minimum([abs(M_start), abs(M_end)])
         M2 = -maximum([abs(M_start), abs(M_end)]) 
 
-        β[i] = S100AISI.v16.app23333(L, Lm, M1, M2)
+        β[i] = AISIS100.v16.app23333(L, Lm, M1, M2)
 
     end
 
@@ -2247,7 +2247,7 @@ function calculate_distortional_buckling_demand_to_capacity(purlin_line)
     eMnd_xx_all = Array{Float64}(undef, length(purlin_line.internal_forces.Mxx))
 
     for i in eachindex(Mnd_xx_all)
-        Mnd_xx_all[i], eMnd_xx_all[i] = S100AISI.v16.f411(My_xx_all[i], Mcrd_xx_all[i], purlin_line.inputs.design_code)
+        Mnd_xx_all[i], eMnd_xx_all[i] = AISIS100.v16.f411(My_xx_all[i], Mcrd_xx_all[i], purlin_line.inputs.design_code)
     end
 
     #check distortional buckling
@@ -2270,7 +2270,7 @@ function calculate_flexure_shear_demand_to_capacity(purlin_line)
     eMnℓ_xx_all = calculate_flexural_capacity_envelope(purlin_line.inputs.segments, eMnℓ_xx_pos_range, eMnℓ_xx_neg_range, purlin_line.internal_forces.Mxx)
     eVn_all = define_expected_strength_along_line(purlin_line.inputs.segments, eVn_range)
 
-    flexure_shear_demand_to_capacity = S100AISI.v16.h21.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Vyy, eMnℓ_xx_all, eVn_all)
+    flexure_shear_demand_to_capacity = AISIS100.v16.h21.(purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Vyy, eMnℓ_xx_all, eVn_all)
 
     return flexure_shear_demand_to_capacity, eMnℓ_xx_all, eVn_all
 
@@ -2293,7 +2293,7 @@ function calculate_biaxial_bending_demand_to_capacity(purlin_line)
     eMnℓ_xx_all = calculate_flexural_capacity_envelope(purlin_line.inputs.segments, eMnℓ_xx_pos_range, eMnℓ_xx_neg_range, purlin_line.internal_forces.Mxx)
     eMnℓ_yy_all = calculate_flexural_capacity_envelope(purlin_line.inputs.segments, eMnℓ_yy_pos_range, eMnℓ_yy_neg_range, purlin_line.internal_forces.Myy)
 
-    results = S100AISI.v16.h121.(purlin_line.internal_forces.P, purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, Pa, eMnℓ_xx_all, eMnℓ_yy_all)
+    results = AISIS100.v16.h121.(purlin_line.internal_forces.P, purlin_line.internal_forces.Mxx, purlin_line.internal_forces.Myy, Pa, eMnℓ_xx_all, eMnℓ_yy_all)
 
     action_P = [x[1] for x in results]
     action_Mxx = [x[2] for x in results]
