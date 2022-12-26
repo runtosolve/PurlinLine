@@ -21,6 +21,7 @@ export build, analyze, test
 
 mutable struct Inputs
 
+    loading_direction::String  
     design_code::String
     segments::Vector{Tuple{Float64, Float64, Int64, Int64}}
     spacing::Float64
@@ -32,17 +33,10 @@ mutable struct Inputs
     frame_flange_width::Float64
     support_locations::Vector{Float64}
     purlin_frame_connections::String
-    bridging_locations::Vector{Float64}  
+    bridging_locations::Vector{Float64}
 
 end
 
-
-
-# Inputs(design_code::String, segments::Vector{Tuple{Float64, Float64, Int64, Int64}}, spacing::Float64, roof_slope::Float64, cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}, material_properties::Vector{NTuple{4, Float64}}, deck_details::Tuple{String, Float64, Float64, Float64, Float64}, 
-# deck_material_properties::NTuple{4, Float64}, frame_flange_width::Float64, support_locations::Vector{Float64}, purlin_frame_connections::String, 
-# bridging_locations::Vector{Float64} ) = Inputs(design_code::String, segments::Vector{Tuple{Float64, Float64, Int64, Int64}}, spacing::Float64, roof_slope::Float64, cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}, material_properties::Vector{NTuple{4, Float64}}, deck_details::Tuple{String, Float64, Float64, Float64, Float64}, 
-# deck_material_properties::NTuple{4, Float64}, frame_flange_width::Float64, support_locations::Vector{Float64}, purlin_frame_connections::String, 
-# bridging_locations::Vector{Float64} )
 
 Base.@kwdef struct CrossSectionData
 
@@ -212,13 +206,13 @@ end
 
 
 
-mutable struct PurlinLineObject
+mutable struct Model
 
     inputs::PurlinLine.Inputs
 
     applied_pressure::Float64
 
-    loading_direction::String
+    # loading_direction::String
 
     cross_section_data::Array{PurlinLine.CrossSectionData}
     free_flange_cross_section_data::Array{PurlinLine.CrossSectionData}
@@ -276,7 +270,7 @@ mutable struct PurlinLineObject
 
     num_iterations_to_failure::Int64
 
-    PurlinLineObject() = new()
+    Model() = new()
 
 end
 
@@ -1734,7 +1728,7 @@ Returns a PurlinLine model built from user inputs.
 function build(inputs)
 
     #Create the data structure.
-    purlin_line = PurlinLineObject()
+    purlin_line = Model()
 
     #Capture inputs.
     # purlin_line.inputs = PurlinLine.Inputs(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
@@ -2544,11 +2538,11 @@ function test(purlin_line)
 
     DC_tolerance = 0.01  
     
-    if purlin_line.loading_direction == "gravity"
+    if purlin_line.inputs.loading_direction == "gravity"
 
         load_sign = 1.0
     
-    elseif purlin_line.loading_direction =="uplift"
+    elseif purlin_line.inputs.loading_direction =="uplift"
     
         load_sign = -1.0
     
