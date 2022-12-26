@@ -1731,13 +1731,14 @@ end
 Returns a PurlinLine model built from user inputs.
 """
 
-function build(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
+function build(inputs)
 
     #Create the data structure.
     purlin_line = PurlinLineObject()
 
     #Capture inputs.
-    purlin_line.inputs = PurlinLine.Inputs(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
+    # purlin_line.inputs = PurlinLine.Inputs(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
+    purlin_line.inputs = inputs
 
     #CALCULATIONS LAYER
 

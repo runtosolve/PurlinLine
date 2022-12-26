@@ -39,7 +39,9 @@ bridging_locations =[ ]
 
 #Calculate purlin line design variables from user inputs and store them in the data structure.
 
-purlin_line = PurlinLine.build(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
+inputs = PurlinLine.Inputs(design_code, segments, spacing, roof_slope, cross_section_dimensions, material_properties, deck_details, deck_material_properties, frame_flange_width, support_locations, purlin_frame_connections, bridging_locations)
+
+purlin_line = PurlinLine.build(inputs)
 
 purlin_line.loading_direction = "gravity"
 
