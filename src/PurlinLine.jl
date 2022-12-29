@@ -1,16 +1,9 @@
 module PurlinLine
 
 using Base: String, Float64
-using CUFSM
-using Dierckx
-using NumericalIntegration
-using AISIS100
-using SectionProperties
-using CrossSection
-using InternalForces
-using ThinWalledBeam
-using ThinWalledBeamColumn
-using ScrewConnections
+using CUFSM, Dierckx, NumericalIntegration, AISIS100, CrossSection, InternalForces
+using ThinWalledBeam, ThinWalledBeamColumn, ScrewConnections
+
 
 export UI
 include("UI.jl")
@@ -45,7 +38,7 @@ Base.@kwdef struct CrossSectionData
     node_geometry::Array{Float64}
     element_definitions::Array{Float64}
     section_properties::CUFSM.SectionPropertiesObject
-    plastic_section_properties::Union{SectionProperties.Lines.PlasticSectionProperties, Nothing} = nothing
+    plastic_section_properties::Union{CrossSection.Properties.PlasticSectionProperties, Nothing} = nothing
 
 end
 
@@ -293,11 +286,11 @@ function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, 
         r = [r_bottom_flange_lip - t, r_bottom_flange_web - t, r_top_flange_web, r_top_flange_lip]
 
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
+        coords_out = CrossSection.Geometry.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
-        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        unit_node_normals = CrossSection.Geometry.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
+        centerline = CrossSection.Geometry.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
 
         xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
         ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
@@ -316,11 +309,11 @@ function define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, 
         r = [r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip]
         
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
+        coords_out = CrossSection.Geometry.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
-        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        unit_node_normals = CrossSection.Geometry.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
+        centerline = CrossSection.Geometry.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
 
         xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
         ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
@@ -366,11 +359,11 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom
         r = [r_bottom_flange_lip - t, r_bottom_flange_web - t]
 
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
+        coords_out = CrossSection.Geometry.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
-        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        unit_node_normals = CrossSection.Geometry.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
+        centerline = CrossSection.Geometry.get_coords_along_node_normals(coords_out, unit_node_normals, t/2)
 
         xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
         ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
@@ -390,11 +383,11 @@ function define_purlin_free_flange_cross_section(cross_section_type, t, d_bottom
         r = [r_bottom_flange_lip, r_bottom_flange_web]
 
         #Get outside coords 
-        coords_out = CrossSection.generate_thin_walled(L, θ, n, r, n_radius)
+        coords_out = CrossSection.Geometry.generate_thin_walled(L, θ, n, r, n_radius)
         #Get node normals on cross-section
-        unit_node_normals = CrossSection.Tools.calculate_cross_section_unit_node_normals(coords_out)
+        unit_node_normals = CrossSection.Geometry.calculate_cross_section_unit_node_normals(coords_out)
         #Get centerline coords
-        centerline = CrossSection.Tools.get_coords_along_node_normals(coords_out, unit_node_normals, -t/2)
+        centerline = CrossSection.Geometry.get_coords_along_node_normals(coords_out, unit_node_normals, -t/2)
 
         xcoords_center = [centerline[i][1] for i in eachindex(centerline)]
         ycoords_center = [centerline[i][2] for i in eachindex(centerline)]
@@ -456,7 +449,7 @@ function define_purlin_section(cross_section_dimensions, n, n_radius)
         purlin_plastic_node_geometry, purlin_plastic_element_info = define_purlin_cross_section(cross_section_type, t, d_bottom, b_bottom, h, b_top, d_top, Θ_bottom_lip, Θ_bottom_flange, Θ_web, Θ_top_flange, Θ_top_lip,  r_bottom_flange_lip, r_bottom_flange_web, r_top_flange_web, r_top_flange_lip, n_plastic, n_radius)
 
         about_axis = "x"  #The strong axis plastic properties are needed for now.  
-        purlin_plastic_section_properties = SectionProperties.Lines.calculate_plastic_section_properties(purlin_plastic_node_geometry, purlin_plastic_element_info, about_axis)
+        purlin_plastic_section_properties = CrossSection.Properties.calculate_plastic_section_properties(purlin_plastic_node_geometry, purlin_plastic_element_info, about_axis)
 
         cross_section_data[i] = CrossSectionData(n, n_radius, purlin_node_geometry, purlin_element_info, purlin_section_properties, purlin_plastic_section_properties)
        

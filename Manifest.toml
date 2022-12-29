@@ -2,7 +2,7 @@
 
 julia_version = "1.8.4"
 manifest_format = "2.0"
-project_hash = "93803154771955018156ac68ed5881eed1e13a0d"
+project_hash = "f73f6a64b41a44bb5ff1974574228403a62493ea"
 
 [[deps.AISIS100]]
 deps = ["CSV", "DataFrames", "Unitful", "UnitfulUS"]
@@ -36,9 +36,9 @@ version = "6.0.24"
 
 [[deps.ArrayInterfaceCore]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
-git-tree-sha1 = "badccc4459ffffb6bce5628461119b7057dec32c"
+git-tree-sha1 = "14c3f84a763848906ac681f94cf469a851601d92"
 uuid = "30b0a656-2188-435a-8636-2ec0e6a096e2"
-version = "0.1.27"
+version = "0.1.28"
 
 [[deps.ArrayInterfaceOffsetArrays]]
 deps = ["ArrayInterface", "OffsetArrays", "Static"]
@@ -150,7 +150,7 @@ uuid = "82b4978f-06ae-48e0-88e8-a26b4f7a0fa1"
 version = "0.1.0"
 
 [[deps.Cairo_jll]]
-deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
+deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.16.1+1"
@@ -265,8 +265,8 @@ uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.1.1"
 
 [[deps.CrossSection]]
-deps = ["CUFSM", "LazySets", "LinearAlgebra", "LinesCurvesNodes", "StaticArrays"]
-git-tree-sha1 = "5d2a23e9bf8b8f8bf9a505014a2e68cadc7a9875"
+deps = ["CUFSM", "LazySets", "LinearAlgebra", "LinesCurvesNodes", "StaticArrays", "Statistics"]
+git-tree-sha1 = "bab89e9155ccade93026025665e0635323d3afc9"
 repo-rev = "main"
 repo-url = "https://github.com/runtosolve/CrossSection.jl.git"
 uuid = "a0443d1a-7a62-4d3d-b993-57eb2183b07a"
@@ -1069,15 +1069,15 @@ version = "1.38.0"
 
 [[deps.Polyester]]
 deps = ["ArrayInterface", "BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "ManualMemory", "PolyesterWeave", "Requires", "Static", "StrideArraysCore", "ThreadingUtilities"]
-git-tree-sha1 = "7446b311ce8f2c3f48be75a2c4b53ff02dd0c1df"
+git-tree-sha1 = "98dcddc8e06e5c3cb68aa7f110dd07e331e09c25"
 uuid = "f517fe37-dbe3-4b94-8317-1923a5111588"
-version = "0.6.18"
+version = "0.6.19"
 
 [[deps.PolyesterWeave]]
-deps = ["BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "Static", "ThreadingUtilities"]
-git-tree-sha1 = "050ca4aa2ca31484b51b849d8180caf8e4449c49"
+deps = ["BitTwiddlingConvenienceFunctions", "IfElse", "Static", "ThreadingUtilities"]
+git-tree-sha1 = "63de27c8748536fae757040069827bde113d1e35"
 uuid = "1d0040c9-8b98-4ee7-8388-3f51789ca0ad"
-version = "0.1.11"
+version = "0.1.12"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
@@ -1254,14 +1254,6 @@ repo-url = "https://github.com/runtosolve/ScrewConnections.git"
 uuid = "5bf228db-695e-4268-9ee9-a0e568bd4ab1"
 version = "0.1.0"
 
-[[deps.SectionProperties]]
-deps = ["LinearAlgebra", "Statistics"]
-git-tree-sha1 = "f84c932853b768089830a12d8cf2f8c0aec56028"
-repo-rev = "main"
-repo-url = "https://github.com/runtosolve/SectionProperties.jl.git"
-uuid = "03320fb2-42b0-43fd-9b66-b95dbaa39193"
-version = "0.1.0"
-
 [[deps.SentinelArrays]]
 deps = ["Dates", "Random"]
 git-tree-sha1 = "efd23b378ea5f2db53a55ae53d3133de4e080aa9"
@@ -1347,9 +1339,9 @@ version = "0.8.3"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "StaticArraysCore", "Statistics"]
-git-tree-sha1 = "ffc098086f35909741f71ce21d03dadf0d2bfa76"
+git-tree-sha1 = "6954a456979f23d05085727adb17c4551c19ecd1"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.5.11"
+version = "1.5.12"
 
 [[deps.StaticArraysCore]]
 git-tree-sha1 = "6b7ba252635a5eff6a0b0664a41ee140a1c9e72a"
@@ -1518,9 +1510,9 @@ version = "0.2.0"
 
 [[deps.Wayland_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
-git-tree-sha1 = "3e61f0b86f90dacb0bc0e73a0c5a83f6a8636e23"
+git-tree-sha1 = "ed8d92d9774b077c53e1da50fd81a36af3744c1c"
 uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
-version = "1.19.0+0"
+version = "1.21.0+0"
 
 [[deps.Wayland_protocols_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
