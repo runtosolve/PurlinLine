@@ -319,12 +319,12 @@ function roof_UI_mapper(purlin_spans, purlin_laps, purlin_spacing, roof_slope, p
 
 	#Run a gravity test.
 	purlin_line_gravity = deepcopy(purlin_line)
-	purlin_line_gravity.loading_direction = "gravity"
+	purlin_line_gravity.inputs.loading_direction = "gravity"
 	purlin_line_gravity = PurlinLine.test(purlin_line_gravity)
 
     #Run an uplift test.
 	purlin_line_uplift = deepcopy(purlin_line)
-	purlin_line_uplift.loading_direction = "uplift"
+	purlin_line_uplift.inputs.loading_direction = "uplift"
 	purlin_line_uplift = PurlinLine.test(purlin_line_uplift)
 
 	return purlin_line_gravity, purlin_line_uplift
