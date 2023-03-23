@@ -67,7 +67,7 @@ end
 
 struct ElasticBucklingData
 
-    CUFSM_data::CUFSM.data
+    CUFSM_data::CUFSM.Model
     Lcr::Float64
     Mcr::Float64
 
@@ -862,7 +862,7 @@ function get_elastic_buckling(prop, node, elem, lengths, springs, constraints, n
 
     curve, shapes = CUFSM.strip(prop, node_with_stress, elem, lengths, springs, constraints, neigs)
 
-    data = CUFSM.data(prop, node_with_stress, elem, lengths, springs, constraints, neigs, curve, shapes)
+    data = CUFSM.Model(prop, node_with_stress, elem, lengths, springs, constraints, neigs, curve, shapes)
 
     half_wavelength = [curve[i,1][1] for i=1:length(lengths)]
     load_factor = [curve[i,1][2] for i=1:length(lengths)]
