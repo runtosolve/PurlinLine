@@ -776,7 +776,7 @@ uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[deps.InternalForces]]
 deps = ["DiffEqOperators"]
-git-tree-sha1 = "406614280082d8b9cc988567fd6a8a04e26dc5cf"
+git-tree-sha1 = "1fbf9b444dcaf19b7321ccaa157da1c5ed70f2fc"
 repo-rev = "main"
 repo-url = "https://github.com/runtosolve/InternalForces.jl.git"
 uuid = "0ac833a1-d586-4577-9e6b-83a7c69b6692"
@@ -1818,7 +1818,7 @@ uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.ThinWalledBeam]]
 deps = ["DiffEqOperators", "LinearAlgebra", "NLsolve"]
-git-tree-sha1 = "116ac6cb2faccd92afada6ef6b92e71d8df92d2f"
+git-tree-sha1 = "1d528ba5d9e3e51e5e2efd008d2825703a94793f"
 repo-rev = "main"
 repo-url = "https://github.com/runtosolve/ThinWalledBeam.jl.git"
 uuid = "1c93ddf5-a21f-4e01-8bde-98213f7f7d54"
@@ -1826,7 +1826,7 @@ version = "0.1.0"
 
 [[deps.ThinWalledBeamColumn]]
 deps = ["DiffEqOperators", "LinearAlgebra", "NLsolve"]
-git-tree-sha1 = "81eec62847620a069ca9173fa5611fe145665961"
+git-tree-sha1 = "0c56fa4232b115313b40fd9366fabe38f1060ad0"
 repo-rev = "main"
 repo-url = "https://github.com/runtosolve/ThinWalledBeamColumn.jl.git"
 uuid = "79be238d-76c4-453b-a7f7-71368c01feb5"
