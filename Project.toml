@@ -5,8 +5,10 @@ version = "0.1.0"
 
 [deps]
 AISIS100 = "01f7396e-a581-4110-84fa-e8964400bef8"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CUFSM = "82b4978f-06ae-48e0-88e8-a26b4f7a0fa1"
 CrossSection = "a0443d1a-7a62-4d3d-b993-57eb2183b07a"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
 FornbergFiniteDiff = "bc6155a8-87c8-416d-b52d-44cfacf6a7f1"
 InternalForces = "0ac833a1-d586-4577-9e6b-83a7c69b6692"

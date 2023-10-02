@@ -35,7 +35,7 @@ support_locations = [0.0, 25.0*12]
 purlin_frame_connections = "bottom flange connection"
 # purlin_frame_connections = "anti-roll clip"
 
-bridging_locations =[ ]
+bridging_locations = Float64[ ]
 
 #Calculate purlin line design variables from user inputs and store them in the data structure.
 

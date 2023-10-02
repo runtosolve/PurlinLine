@@ -21,6 +21,7 @@ material_properties = [(29500.0, 0.30, 55.0, 70.0)]
 
 #type="screw-fastened", thickness, fastener spacing, fastener diameter, fastener_shear_strength
 deck_details = ("screw-fastened", 0.018, 6.0, 0.212, 2.50)
+deck_details = ("vertical leg standing seam", 18.0)
 
 deck_material_properties = (29500.0, 0.30, 55.0, 70.0)
 

@@ -21,7 +21,7 @@ mutable struct Inputs
     roof_slope::Float64
     cross_section_dimensions::Vector{Tuple{String, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64}}
     material_properties::Vector{NTuple{4, Float64}}
-    deck_details::Any   #through-fastened or standing seam
+    deck_details::Union{Tuple{String, Vararg{Float64, 4}}, Tuple{String, Float64}}   #through-fastened or standing seam
     deck_material_properties::NTuple{4, Float64}
     frame_flange_width::Float64
     support_locations::Vector{Float64}
