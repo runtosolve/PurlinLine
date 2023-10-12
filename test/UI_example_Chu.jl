@@ -12,11 +12,11 @@ using PurlinLine
 
 purlin_types = ["Z8x2.5 060"]
 
-purlin_spans = tuple(ones(Float64, 4) .* 25.0...)  #ft
+purlin_spans = ones(Float64, 4) .* 25.0  #ft
 
-purlin_size_span_assignment = tuple(ones(Int, 8)...)
+purlin_size_span_assignment = ones(Int, 8)
 
-purlin_laps = tuple(ones(Float64, 3*2) .* 18.0/12...)
+purlin_laps = ones(Float64, 3*2) .* 18.0/12
 
 purlin_spacing = 5.0  #ft
 
