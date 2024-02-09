@@ -26,4 +26,11 @@ roof_slope = 1.0/12
 
 deck_type = "SSR Ultra-Dek 18 in. 24 ga";
 
-purlin_line_gravity = UI.calculate_response(purlin_spans, purlin_laps, purlin_spacing, roof_slope, purlin_data, deck_type, deck_data, frame_flange_width, purlin_types, purlin_size_span_assignment);
+loading_direction = "gravity"   
+
+purlin_line_results = UI.calculate_response(purlin_spans, purlin_laps, purlin_spacing, roof_slope, purlin_data, deck_type, deck_data, frame_flange_width, purlin_types, purlin_size_span_assignment, loading_direction);
+
+
+loading_direction = "uplift"   
+
+purlin_line_results = UI.calculate_response(purlin_spans, purlin_laps, purlin_spacing, roof_slope, purlin_data, deck_type, deck_data, frame_flange_width, purlin_types, purlin_size_span_assignment, loading_direction);

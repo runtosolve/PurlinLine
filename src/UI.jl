@@ -291,7 +291,7 @@ function define_span_segments(purlin_spans, purlin_laps, purlin_size_span_assign
 
 end
 
-function calculate_response(purlin_spans, purlin_laps, purlin_spacing, roof_slope, purlin_data, existing_deck_type, existing_deck_data, frame_flange_width, purlin_types, purlin_size_span_assignment)
+function calculate_response(purlin_spans, purlin_laps, purlin_spacing, roof_slope, purlin_data, existing_deck_type, existing_deck_data, frame_flange_width, purlin_types, purlin_size_span_assignment, loading_direction)
 
 	design_code = "AISI S100-16 ASD"
 
@@ -337,28 +337,17 @@ function calculate_response(purlin_spans, purlin_laps, purlin_spacing, roof_slop
 
 	intermediate_bridging_locations = [ ]
 
-	loading_direction = "gravity"
 	inputs = PurlinLine.Inputs(loading_direction, design_code, purlin_segments, purlin_spacing, roof_slope, purlin_cross_section_dimensions, purlin_material_properties, existing_roof_panel_details, existing_roof_panel_material_properties, frame_flange_width, support_locations, purlin_frame_connections, intermediate_bridging_locations)
 	
 	purlin_line = PurlinLine.build(inputs)
 
-# #Perform a test to collapse.
-# purlin_line = PurlinLine.test(purlin_line);
+	#Load to collapse.
+	purlin_line_init = deepcopy(purlin_line)
+	purlin_line_init.inputs.loading_direction = loading_direction
+	purlin_line_results = PurlinLine.test(purlin_line_init)
 
 
-# 	purlin_line = PurlinLine.build(design_code, purlin_segments, purlin_spacing, roof_slope, purlin_cross_section_dimensions, purlin_material_properties, existing_roof_panel_details, existing_roof_panel_material_properties, frame_flange_width, support_locations, purlin_frame_connections, intermediate_bridging_locations)
-
-	#Run a gravity test.
-	purlin_line_gravity = deepcopy(purlin_line)
-	purlin_line_gravity.inputs.loading_direction = "gravity"
-	purlin_line_gravity = PurlinLine.test(purlin_line_gravity)
-
-    # #Run an uplift test.
-	# purlin_line_uplift = deepcopy(purlin_line)
-	# purlin_line_uplift.inputs.loading_direction = "uplift"
-	# purlin_line_uplift = PurlinLine.test(purlin_line_uplift)
-
-	return purlin_line_gravity
+	return purlin_line_results
 
 end
 
